@@ -1,7 +1,22 @@
+#
+# Copyright 2021 SkyAPM
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 import xml.dom.minidom
 import time, os
 
-version = '4.1.2'
+version = '4.2.0'
 
 git = os.popen('git ls-files')
 res = git.read()
@@ -64,7 +79,7 @@ config = [
     {'key': 'license', 'value': 'Apache2.0', 'attr': [
         {'key': 'uri', 'value': 'http://www.apache.org/licenses/LICENSE-2.0.html'}
     ]},
-    {'key': 'notes', 'value': 'Add mysqli'}, # release notes
+    {'key': 'notes', 'value': 'Fix bugs'}, # release notes
     {'key': 'contents', 'child': [
         {'key': 'dir', 'attr': [
             {'key': 'name', 'value': '/'},
@@ -83,6 +98,36 @@ config = [
     {'key': 'providesextension', 'value': 'skywalking'},
     {'key': 'extsrcrelease'},
     {'key': 'changelog', 'child': [
+        {'key': 'release', 'child': [
+            {'key': 'version', 'child': [
+                {'key': 'release', 'value': '4.2.0'},
+                {'key': 'api', 'value': '4.2.0'}
+            ]
+             },
+            {'key': 'stability', 'child': [
+                {'key': 'release', 'value': 'stable'},
+                {'key': 'api', 'value': 'stable'}
+            ]
+             },
+            {'key': 'notes', 'value': 'Fix bugs'}
+        ]
+         },
+
+        {'key': 'release', 'child': [
+            {'key': 'version', 'child': [
+                    {'key': 'release', 'value': '4.1.3'},
+                    {'key': 'api', 'value': '4.1.3'}
+                ]
+            },
+            {'key': 'stability', 'child': [
+                    {'key': 'release', 'value': 'stable'},
+                    {'key': 'api', 'value': 'stable'}
+                ]
+            },
+                {'key': 'notes', 'value': 'Fix bugs'}
+            ]
+        },
+
         {'key': 'release', 'child': [
                 {'key': 'version', 'child': [
                         {'key': 'release', 'value': '4.1.2'},

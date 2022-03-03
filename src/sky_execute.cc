@@ -1,16 +1,20 @@
-// contributor license agreements.  See the NOTICE file distributed with
-// this work for additional information regarding copyright ownership.
-// The ASF licenses this file to You under the Apache License, Version 2.0
-// (the "License"); you may not use this file except in compliance with
-// the License.  You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright 2021 SkyAPM
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 
 #include <iostream>
 #include <thread>
@@ -20,8 +24,10 @@
 #include "php_skywalking.h"
 
 #include "sky_plugin_predis.h"
-#include "sky_grpc.h"
+#include "sky_plugin_grpc.h"
 #include "sky_plugin_redis.h"
+#include "sky_plugin_memcached.h"
+#include "sky_plugin_yar.h"
 #include "sky_plugin_rabbit_mq.h"
 #include "sky_plugin_hyperf_guzzle.h"
 #include "sky_plugin_swoole_curl.h"
@@ -83,7 +89,8 @@ void sky_execute_ex(zend_execute_data *execute_data) {
         if (strcmp(function_name, "executeCommand") == 0) {
             span = sky_predis(execute_data, class_name, function_name);
         } else if (strcmp(class_name, "Grpc\\BaseStub") == 0) {
-            span = sky_grpc(execute_data, class_name, function_name);
+            afterExec = false;
+            span = sky_plugin_grpc(execute_data, class_name, function_name);
         } else if (strcmp(class_name, "PhpAmqpLib\\Channel\\AMQPChannel") == 0) {
             span = sky_plugin_rabbit_mq(execute_data, class_name, function_name);
         } else if ((SKY_STRCMP(class_name, "Hyperf\\Guzzle\\CoroutineHandler") ||
@@ -108,7 +115,6 @@ void sky_execute_ex(zend_execute_data *execute_data) {
 
     if (swoole) {
         sky_request_flush(sw_response, request_id);
-        zval_dtor(&SKYWALKING_G(curl_header));
     }
 }
 
@@ -145,7 +151,7 @@ void sky_execute_internal(zend_execute_data *execute_data, zval *return_value) {
             uint32_t arg_count = ZEND_CALL_NUM_ARGS(execute_data);
             if (arg_count >= 1) {
                 zval *status = ZEND_CALL_ARG(execute_data, 1);
-                if (Z_TYPE_P(status) == IS_LONG) {
+                if (Z_TYPE_P(status) == IS_LONG && segment != nullptr) {
                     segment->setStatusCode(Z_LVAL_P(status));
                 }
             }
@@ -160,6 +166,12 @@ void sky_execute_internal(zend_execute_data *execute_data, zval *return_value) {
             span = sky_plugin_mysqli(execute_data, class_name, function_name);
         } else if (strcmp(class_name, "Redis") == 0) {
             span = sky_plugin_redis(execute_data, class_name, function_name);
+        } else if (strcmp(class_name, "Memcached") == 0) {
+          span = sky_plugin_memcached(execute_data, class_name, function_name);
+        } else if (strcmp(class_name, "Yar_Client") == 0) {
+          span = sky_plugin_yar_client(execute_data, class_name, function_name);
+        } else if (strcmp(class_name, "Yar_Server") == 0) {
+          span = sky_plugin_yar_server(execute_data, class_name, function_name);
         }
     } else if (function_name != nullptr) {
         if (strcmp(function_name, "mysqli_") > 0) {
@@ -182,15 +194,15 @@ void sky_execute_internal(zend_execute_data *execute_data, zval *return_value) {
                     sky_pdo_check_errors(execute_data, span);
                 }
             } else if (strcmp(class_name, "mysqli") == 0){
-                if (Z_TYPE_P(return_value) == IS_FALSE) { 
-                    span->setIsError(true);  
+                if (Z_TYPE_P(return_value) == IS_FALSE) {
+                    span->setIsError(true);
                     sky_plugin_mysqli_check_errors(execute_data, span, 1);
                 }
             }
         } else if (function_name != nullptr) {
             if (strcmp(function_name, "mysqli_") > 0) {
-                if (Z_TYPE_P(return_value) == IS_FALSE) { 
-                    span->setIsError(true);  
+                if (Z_TYPE_P(return_value) == IS_FALSE) {
+                    span->setIsError(true);
                     sky_plugin_mysqli_check_errors(execute_data, span, 0);
                 }
             }

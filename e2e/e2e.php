@@ -1,5 +1,20 @@
 <?php
-
+/*
+ * Copyright 2021 SkyAPM
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 require_once __DIR__ . '/vendor/autoload.php';
 
 class E2E {
@@ -86,8 +101,9 @@ GRAPHQL;
         $ch = curl_init('http://127.0.0.1:8083/call');
         curl_exec($ch);
         if (curl_getinfo($ch, CURLINFO_HTTP_CODE) != 200) {
-            exit(2);
+            return false;
         }
+        return true;
     }
 
     public function verifyServices() {
@@ -217,23 +233,29 @@ $check = ['verifyServices'];
 $e2e = new E2E();
 
 foreach($check as $func) {
+    $e2e->info('php version:' . $argv[1]);
     $e2e->info('exec ' . $func);
 
     $status = false;
     for($i = 1; $i <= 10; $i++) {
          $e2e->info("test $func $i/10...");
-         $e2e->call();
-         sleep(1);
+         $status = $e2e->call();
+         if (!$status) {
+            break;
+         }
+         sleep(5);
          $status = $e2e->$func();
          if ($status === true) {
              $status = true;
              break;
          }
-         sleep(1);
+         sleep(10);
     }
 
     if (!$status) {
         $e2e->info("test $func fail...");
+        echo(file_get_contents("/var/log/php" . $argv[1] . "-fpm.log"));
+        system("sudo chmod -R +rwx /var/crash/*");
         exit(2);
     }
 

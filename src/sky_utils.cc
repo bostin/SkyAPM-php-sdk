@@ -1,22 +1,30 @@
-// contributor license agreements.  See the NOTICE file distributed with
-// this work for additional information regarding copyright ownership.
-// The ASF licenses this file to You under the Apache License, Version 2.0
-// (the "License"); you may not use this file except in compliance with
-// the License.  You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright 2021 SkyAPM
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 
-#include <map>
+
+#include <unordered_map>
 #include <iostream>
+#include <mutex>
 #include "sky_utils.h"
 
 #include "php_skywalking.h"
+
+// protect SKYWALKING_G(segment)'s insert and remove
+static std::mutex segments_mutex;
 
 bool starts_with(const char *pre, const char *str) {
     size_t len_pre = strlen(pre),
@@ -119,24 +127,53 @@ int64_t sky_find_swoole_fd(zend_execute_data *execute_data) {
 Segment *sky_get_segment(zend_execute_data *execute_data, int64_t request_id) {
 
     if (SKYWALKING_G(segment) == nullptr) {
+        // can't be here, since module_init has assigned a map to SKYWALKING_G(segment)
         return nullptr;
     }
 
-    auto *segments = static_cast<std::map<uint64_t, Segment *> *>SKYWALKING_G(segment);
-
+    auto *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>SKYWALKING_G(segment);
+    bool do_search = false;
+    uint64_t key = 0;
     if (request_id >= 0) {
-        return segments->at(request_id);
+        key = request_id;
+        do_search = true;
     } else {
         if (SKYWALKING_G(is_swoole)) {
             int64_t fd = sky_find_swoole_fd(execute_data);
             if (fd > 0) {
-                return segments->at(fd);
+                key = fd;
+                do_search = true;
             }
         } else {
-            return segments->at(0);
+            do_search = true;
         }
     }
+
+    if (do_search) {
+        auto it = segments->find(key);
+        if (it != segments->end()) {
+            return it->second;
+        }
+    }
+
     return nullptr;
+}
+
+bool sky_insert_segment(uint64_t request_id, Segment *segment) {
+    auto *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>SKYWALKING_G(segment);
+    std::lock_guard<std::mutex> lock(segments_mutex);
+
+    std::pair<std::unordered_map<uint64_t, Segment *>::iterator, bool> result;
+    result = segments->insert(std::pair<uint64_t, Segment *>(request_id, segment));
+
+    return result.second;
+}
+
+void sky_remove_segment(uint64_t request_id) {
+    auto *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>SKYWALKING_G(segment);
+    std::lock_guard<std::mutex> lock(segments_mutex);
+
+    segments->erase(request_id);
 }
 
 std::string sky_get_class_name(zval *obj) {
@@ -151,4 +188,24 @@ long getUnixTimeStamp() {
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch());
     return ms.count();
+}
+
+std::string sky_json_encode(zval *parameter) {
+  std::string str;
+  smart_str buf = {nullptr};
+  zend_long options = 256;
+#if PHP_VERSION_ID >= 70100
+  if (php_json_encode(&buf, parameter, (int) options) != SUCCESS) {
+        smart_str_free(&buf);
+        return str;
+    }
+#else
+  php_json_encode(&buf, parameter, (int) options);
+#endif
+  smart_str_0(&buf);
+  if (buf.s != nullptr) {
+    str = std::string(ZSTR_VAL(buf.s));
+    smart_str_free(&buf);
+  }
+  return str;
 }

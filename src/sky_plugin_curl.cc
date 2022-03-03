@@ -1,16 +1,20 @@
-// contributor license agreements.  See the NOTICE file distributed with
-// this work for additional information regarding copyright ownership.
-// The ASF licenses this file to You under the Apache License, Version 2.0
-// (the "License"); you may not use this file except in compliance with
-// the License.  You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright 2021 SkyAPM
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 
 #include <iostream>
 #include "sky_plugin_curl.h"
@@ -30,7 +34,7 @@ void (*orig_curl_close)(INTERNAL_FUNCTION_PARAMETERS) = nullptr;
 void sky_curl_setopt_handler(INTERNAL_FUNCTION_PARAMETERS) {
 
     auto *segment = sky_get_segment(execute_data, -1);
-    if (segment == nullptr) {
+    if (segment == nullptr || segment->skip()) {
         orig_curl_setopt(INTERNAL_FUNCTION_PARAM_PASSTHRU);
         return;
     }
@@ -54,22 +58,19 @@ void sky_curl_setopt_handler(INTERNAL_FUNCTION_PARAMETERS) {
     if (SKY_CURLOPT_HTTPHEADER == options) {
         zval *header = ZEND_CALL_ARG(execute_data, 2);
         header->value.lval = CURLOPT_HTTPHEADER;
-        orig_curl_setopt(INTERNAL_FUNCTION_PARAM_PASSTHRU);
-    } else {
-        if (CURLOPT_HTTPHEADER == options && Z_TYPE_P(zvalue) == IS_ARRAY) {
-            zval dup_header;
-            ZVAL_DUP(&dup_header, zvalue);
-            add_index_zval(&SKYWALKING_G(curl_header), cid, &dup_header);
-        } else {
-            orig_curl_setopt(INTERNAL_FUNCTION_PARAM_PASSTHRU);
-        }
+    } else if (CURLOPT_HTTPHEADER == options && Z_TYPE_P(zvalue) == IS_ARRAY) {
+        zval dup_header;
+        ZVAL_DUP(&dup_header, zvalue);
+        add_index_zval(&SKYWALKING_G(curl_header), cid, &dup_header);
     }
+
+    orig_curl_setopt(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 }
 
 void sky_curl_setopt_array_handler(INTERNAL_FUNCTION_PARAMETERS) {
 
     auto *segment = sky_get_segment(execute_data, -1);
-    if (segment == nullptr) {
+    if (segment == nullptr || segment->skip()) {
         orig_curl_setopt_array(INTERNAL_FUNCTION_PARAM_PASSTHRU);
         return;
     }
@@ -102,7 +103,7 @@ void sky_curl_setopt_array_handler(INTERNAL_FUNCTION_PARAMETERS) {
 
 void sky_curl_exec_handler(INTERNAL_FUNCTION_PARAMETERS) {
     auto *segment = sky_get_segment(execute_data, -1);
-    if (segment == nullptr) {
+    if (segment == nullptr || segment->skip()) {
         orig_curl_exec(INTERNAL_FUNCTION_PARAM_PASSTHRU);
         return;
     }
@@ -234,7 +235,10 @@ void sky_curl_exec_handler(INTERNAL_FUNCTION_PARAMETERS) {
             zval_dtor(&args[0]);
             zval_dtor(&curl_error);
         } else if (Z_LVAL_P(response_http_code) >= 400) {
-            // TODO: response body set to logs
+            if (SKYWALKING_G(curl_response_enable) && Z_TYPE_P(return_value) == IS_STRING) {
+                span->addTag("http.response", Z_STRVAL_P(return_value));
+            }
+
             span->setIsError(true);
         } else {
             span->setIsError(false);
@@ -253,7 +257,7 @@ void sky_curl_exec_handler(INTERNAL_FUNCTION_PARAMETERS) {
 void sky_curl_close_handler(INTERNAL_FUNCTION_PARAMETERS) {
 
     auto *segment = sky_get_segment(execute_data, -1);
-    if (segment == nullptr) {
+    if (segment == nullptr || segment->skip()) {
         orig_curl_close(INTERNAL_FUNCTION_PARAM_PASSTHRU);
         return;
     }

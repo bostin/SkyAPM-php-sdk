@@ -1,4 +1,19 @@
 /*
+ * Copyright 2021 SkyAPM
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ *
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
@@ -50,6 +65,15 @@ PHP_INI_BEGIN()
     STD_PHP_INI_BOOLEAN("skywalking.error_handler_enable", "0", PHP_INI_ALL, OnUpdateBool, error_handler_enable, zend_skywalking_globals, skywalking_globals)
 
     STD_PHP_INI_ENTRY("skywalking.mq_max_message_length", "20480", PHP_INI_ALL, OnUpdateLong, mq_max_message_length, zend_skywalking_globals, skywalking_globals)
+    STD_PHP_INI_ENTRY("skywalking.mq_unique", "0", PHP_INI_ALL, OnUpdateBool, mq_unique, zend_skywalking_globals, skywalking_globals)
+
+    STD_PHP_INI_ENTRY("skywalking.sample_n_per_3_secs", "-1", PHP_INI_ALL, OnUpdateLong, sample_n_per_3_secs, zend_skywalking_globals, skywalking_globals)
+
+    STD_PHP_INI_ENTRY("skywalking.instance_name", "", PHP_INI_ALL, OnUpdateString, instance_name, zend_skywalking_globals, skywalking_globals)
+
+    STD_PHP_INI_BOOLEAN("skywalking.curl_response_enable", "0", PHP_INI_ALL, OnUpdateBool, curl_response_enable, zend_skywalking_globals, skywalking_globals)
+
+
 
 PHP_INI_END()
 
@@ -75,6 +99,14 @@ static void php_skywalking_init_globals(zend_skywalking_globals *skywalking_glob
 
     // message queue
     skywalking_globals->mq_max_message_length = 0;
+
+    // rate limit
+    skywalking_globals->sample_n_per_3_secs = -1;
+
+    // uuid path
+    skywalking_globals->instance_name = nullptr;
+
+    skywalking_globals->curl_response_enable = 0;
 }
 
 PHP_FUNCTION (skywalking_trace_id) {

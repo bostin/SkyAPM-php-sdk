@@ -1,16 +1,20 @@
-// contributor license agreements.  See the NOTICE file distributed with
-// this work for additional information regarding copyright ownership.
-// The ASF licenses this file to You under the Apache License, Version 2.0
-// (the "License"); you may not use this file except in compliance with
-// the License.  You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright 2021 SkyAPM
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 
 #include <regex>
 #include "sky_pdo.h"
@@ -27,6 +31,10 @@ Span *sky_pdo(zend_execute_data *execute_data, const std::string &class_name, co
             function_name == "prepare" || function_name == "commit" ||
             function_name == "begintransaction" || function_name == "rollback") {
             auto *segment = sky_get_segment(execute_data, -1);
+            if (segment->skip()) {
+                return nullptr;
+            }
+
             auto *span = segment->createSpan(SkySpanType::Exit, SkySpanLayer::Database, 8003);
             span->setOperationName(class_name + "->" + function_name);
 
@@ -46,6 +54,10 @@ Span *sky_pdo(zend_execute_data *execute_data, const std::string &class_name, co
     } else {
         if (function_name == "execute") {
             auto *segment = sky_get_segment(execute_data, -1);
+            if (segment->skip()) {
+                return nullptr;
+            }
+
             auto *span = segment->createSpan(SkySpanType::Exit, SkySpanLayer::Database, 8003);
             span->setOperationName(class_name + "->" + function_name);
 
@@ -63,8 +75,11 @@ std::string sky_pdo_statement_peer(Span *span, zend_execute_data *execute_data) 
     pdo_stmt_t *stmt = (pdo_stmt_t *) Z_PDO_STMT_P(&(execute_data->This));
 
     if (stmt != nullptr) {
-
+#if PHP_VERSION_ID >= 80100
+        span->addTag("db.statement", ZSTR_VAL(stmt->query_string));
+#else
         span->addTag("db.statement", stmt->query_string);
+#endif
 
         if (stmt->dbh != nullptr) {
             return sky_pdo_dbh_peer(span, stmt->dbh);

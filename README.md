@@ -1,7 +1,6 @@
 SkyAPM PHP
 ==========
 ![CI](https://github.com/SkyAPM/SkyAPM-php-sdk/workflows/CI/badge.svg)
-![CI](https://travis-ci.org/SkyAPM/SkyAPM-php-sdk.svg?branch=master)
 ![release](https://img.shields.io/github/release/SkyAPM/SkyAPM-php-sdk.svg)
 ![PHP](https://img.shields.io/badge/PHP-%3E%3D%207.0-brightgreen.svg)
 ![contributors](https://img.shields.io/github/contributors/SkyAPM/SkyAPM-php-sdk.svg)
@@ -18,14 +17,16 @@ SkyAPM PHP
 1. CURL
 1. PDO
 1. Mysqli
-1. Yar Client ([Yar](https://www.php.net/manual/en/book.yar.php))
+1. Yar Client (version > 2.0.4) ([Yar](https://www.php.net/manual/en/book.yar.php))
+1. Yar Server ([Yar](https://www.php.net/manual/en/book.yar.php))
 1. GRPC Client ([GRPC](https://github.com/grpc/grpc-php))
 1. Predis Client ([Predis](https://packagist.org/packages/predis/predis))
 1. Redis Extension ([Redis Extension](https://github.com/phpredis/phpredis))
-1. Memcache Extension
+1. Memcache Extension ([Memcache Extension](https://www.php.net/manual/en/book.memcached.php))
 1. RabbitMQ
 1. Swoole ([Swoole](https://github.com/swoole/swoole-src))
 1. Hyperf ([Hyperf](https://github.com/hyperf/hyperf))
+1. Swoft ([Swoft](https://github.com/swoft-cloud/swoft))
 1. Tars-php ([Tars-php](https://github.com/TarsPHP/TarsPHP))
 1. LaravelS ([LaravelS](https://github.com/hhxsv5/laravel-s))
 
@@ -35,7 +36,7 @@ SkyAPM PHP
 ## Docker image (Quick start)
 Go to Docker hub -> [https://hub.docker.com/u/skyapm](https://hub.docker.com/u/skyapm)
 ```shell script
-docker run -d -e SW_OAP_ADDRESS=127.0.0.1:11800 skyapm/skywalking-php-8.0-fpm-alpine
+$ docker run --restart always -d -e SW_OAP_ADDRESS=oap:11800 skyapm/skywalking-php
 ```
 
 ## Downloads

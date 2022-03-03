@@ -1,16 +1,20 @@
-// contributor license agreements.  See the NOTICE file distributed with
-// this work for additional information regarding copyright ownership.
-// The ASF licenses this file to You under the Apache License, Version 2.0
-// (the "License"); you may not use this file except in compliance with
-// the License.  You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright 2021 SkyAPM
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 
 #include "span.h"
 #include "sky_core_span_log.h"
@@ -25,8 +29,21 @@ Span::Span() {
 }
 
 Span::~Span() {
+    for (auto ref : refs) {
+        delete ref;
+    }
+    refs.clear();
+    refs.shrink_to_fit();
+
+    for (auto tag : tags) {
+        delete tag;
+    }
     tags.clear();
     tags.shrink_to_fit();
+
+    for (auto log : logs) {
+        delete log;
+    }
     logs.clear();
     logs.shrink_to_fit();
 }
@@ -48,15 +65,15 @@ long Span::getEndTime() const {
     return endTime;
 }
 
-std::vector<SkySegmentReference *> Span::getRefs() {
+const std::vector<SkySegmentReference*>& Span::getRefs() {
     return refs;
 }
 
-std::string Span::getOperationName() {
+const std::string& Span::getOperationName() {
     return operationName;
 }
 
-std::string Span::getPeer() {
+const std::string& Span::getPeer() {
     return peer;
 }
 
@@ -76,18 +93,17 @@ bool Span::getIsError() const {
     return isError;
 }
 
-std::vector<Tag *> Span::getTags() {
+const std::vector<Tag*>& Span::getTags() {
     return tags;
 }
 
-std::vector<SkyCoreSpanLog *> Span::getLogs() {
+const std::vector<SkyCoreSpanLog*>& Span::getLogs() {
     return logs;
 }
 
 bool Span::getSkipAnalysis() const {
     return skipAnalysis;
 }
-
 
 // set
 void Span::setEndTIme() {
