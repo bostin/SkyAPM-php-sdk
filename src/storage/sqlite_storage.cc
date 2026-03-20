@@ -182,7 +182,7 @@ void SQLiteStorage::rollbackTransaction() {
     execute("ROLLBACK;");
 }
 
-bool SQLiteStorage::saveSegment(const Segment* segment) {
+bool SQLiteStorage::saveSegment(Segment* segment) {
     if (!initialized_ || !db_ || !segment) {
         return false;
     }

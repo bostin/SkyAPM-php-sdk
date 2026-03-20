@@ -53,7 +53,7 @@ public:
      * @param segment 追踪段指针
      * @return 保存成功返回 true，失败返回 false
      */
-    bool saveSegment(const Segment* segment) override;
+    bool saveSegment(Segment* segment) override;
 
     /**
      * 根据 traceId 查询追踪数据

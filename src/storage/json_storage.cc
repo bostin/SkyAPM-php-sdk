@@ -41,7 +41,7 @@ void JsonStorage::shutdown() {
     // JSON 文件模式无需关闭
 }
 
-bool JsonStorage::saveSegment(const Segment* segment) {
+bool JsonStorage::saveSegment(Segment* segment) {
     if (!segment) {
         return false;
     }

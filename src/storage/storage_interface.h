@@ -40,10 +40,10 @@ public:
 
     /**
      * 保存追踪段数据
-     * @param segment 追踪段指针
+     * @param segment 追踪段指针（非const，因为marshal()会修改span）
      * @return 保存成功返回 true，失败返回 false
      */
-    virtual bool saveSegment(const Segment* segment) = 0;
+    virtual bool saveSegment(Segment* segment) = 0;
 
     /**
      * 根据 traceId 查询追踪数据
