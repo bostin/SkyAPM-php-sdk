@@ -7,12 +7,6 @@ PHP_ARG_ENABLE([skywalking],
     [Enable skywalking support])],
   [yes])
 
-PHP_ARG_WITH([grpc],,
-  [AS_HELP_STRING([[--with-grpc[=DIR]]],
-    [gRPC: gPRC support])],
-  [no],
-  [no])
-
 if test "$PHP_THREAD_SAFETY" == "yes"; then
   AC_MSG_ERROR([skywalking does not support ZTS])
 fi
@@ -38,7 +32,7 @@ else
 fi
 
 if test "$json_inc_path" = ""; then
-  AC_MSG_ERROR([Could not fond php_json.h, please reinstall the php-json extension])
+  AC_MSG_ERROR([Could not find php_json.h, please reinstall the php-json extension])
 else
   AC_MSG_RESULT([found in $json_inc_path])
 fi
@@ -46,82 +40,7 @@ fi
 
 if test "$PHP_SKYWALKING" != "no"; then
 
-  dnl grpc
-  if test "$PHP_GRPC" == "no"; then
-    AC_MSG_ERROR([skywalking extension requires gRPC extension, add --with-grpc=[DIR]])
-  fi
-
-  SEARCH_GRPC_FOR="libgrpc.a libgpr.a libgrpc++.a libupb.a libaddress_sorting.a third_party/protobuf/libprotobuf.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/re2/libre2.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/status/libabsl_status.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/strings/libabsl_strings.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/strings/libabsl_strings_internal.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/strings/libabsl_str_format_internal.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/strings/libabsl_cord.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/numeric/libabsl_int128.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/types/libabsl_bad_optional_access.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/synchronization/libabsl_synchronization.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/synchronization/libabsl_graphcycles_internal.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/base/libabsl_base.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/base/libabsl_throw_delegate.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/base/libabsl_raw_logging_internal.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/base/libabsl_malloc_internal.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/base/libabsl_spinlock_wait.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/time/libabsl_time.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/time/libabsl_time_zone.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/debugging/libabsl_symbolize.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/debugging/libabsl_stacktrace.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/abseil-cpp/absl/debugging/libabsl_debugging_internal.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/cares/cares/lib/libcares.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/boringssl-with-bazel/libssl.a"
-  SEARCH_GRPC_FOR="$SEARCH_GRPC_FOR third_party/boringssl-with-bazel/libcrypto.a"
-  AC_MSG_CHECKING([for grpc files in $PHP_GRPC path])
-  for i in $SEARCH_GRPC_FOR ; do
-    target=$PHP_GRPC/cmake/build/$i
-    if test -r $target; then
-      AC_MSG_RESULT(found in $target)
-    else
-      AC_MSG_ERROR([not found $target])
-    fi
-  done
-
-
-  PHP_ADD_INCLUDE($PHP_GRPC/include)
-  PHP_ADD_INCLUDE($PHP_GRPC/third_party/protobuf/src)
-
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/libgrpc++.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/libgrpc.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/libgpr.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/libupb.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/libaddress_sorting.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/protobuf/libprotobuf.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/re2/libre2.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/status/libabsl_status.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/strings/libabsl_strings.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/strings/libabsl_strings_internal.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/strings/libabsl_str_format_internal.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/strings/libabsl_cord.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/numeric/libabsl_int128.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/types/libabsl_bad_optional_access.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/synchronization/libabsl_synchronization.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/synchronization/libabsl_graphcycles_internal.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/base/libabsl_base.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/base/libabsl_throw_delegate.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/base/libabsl_raw_logging_internal.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/base/libabsl_malloc_internal.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/base/libabsl_spinlock_wait.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/time/libabsl_time.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/time/libabsl_time_zone.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/debugging/libabsl_symbolize.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/debugging/libabsl_stacktrace.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/abseil-cpp/absl/debugging/libabsl_debugging_internal.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/cares/cares/lib/libcares.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/boringssl-with-bazel/libssl.a"
-  SKYWALKING_EXTRA_LDFLAGS="$SKYWALKING_EXTRA_LDFLAGS $PHP_GRPC/cmake/build/third_party/boringssl-with-bazel/libcrypto.a"
-  EXTRA_LDFLAGS="$EXTRA_LDFLAGS $SKYWALKING_EXTRA_LDFLAGS"
-
   LIBS="-lpthread $LIBS"
-
   SKYWALKING_SHARED_LIBADD="-lpthread $SKYWALKING_SHARED_LIBADD"
   PHP_ADD_LIBRARY(pthread)
   PHP_ADD_LIBRARY(dl,,SKYWALKING_SHARED_LIBADD)
@@ -137,28 +56,9 @@ if test "$PHP_SKYWALKING" != "no"; then
       ;;
   esac
 
-  AC_PATH_PROG(PROTOC, protoc, no, $PHP_GRPC/cmake/build/third_party/protobuf)
-  if ! test -x "$PROTOC"; then
-    AC_MSG_ERROR([protoc command missing, please reinstall the protobuf distribution])
-  fi
-  AC_PATH_PROG(GRPC_CPP_PLUGIN, grpc_cpp_plugin, no, $PHP_GRPC/cmake/build)
-  if ! test -x "$GRPC_CPP_PLUGIN"; then
-    AC_MSG_ERROR([grpc_cpp_plugin command missing, please reinstall the grpc distribution])
-  fi
-
-  mkdir -p src/network/v3
-  $PROTOC -I src/protocol/v3 --grpc_out=src/network/v3 --plugin=protoc-gen-grpc=$GRPC_CPP_PLUGIN --cpp_out=src/network/v3 src/protocol/v3/common/Common.proto
-  $PROTOC -I src/protocol/v3 --grpc_out=src/network/v3 --plugin=protoc-gen-grpc=$GRPC_CPP_PLUGIN --cpp_out=src/network/v3 src/protocol/v3/language-agent/*.proto
-  $PROTOC -I src/protocol/v3 --grpc_out=src/network/v3 --plugin=protoc-gen-grpc=$GRPC_CPP_PLUGIN --cpp_out=src/network/v3 src/protocol/v3/profile/*.proto
-  $PROTOC -I src/protocol/v3 --grpc_out=src/network/v3 --plugin=protoc-gen-grpc=$GRPC_CPP_PLUGIN --cpp_out=src/network/v3 src/protocol/v3/management/*.proto
-  find src -name "*.grpc.pb.cc" | while read id; do mv $id ${id/.grpc/_grpc}; done
-
-
   PHP_SUBST(SKYWALKING_SHARED_LIBADD)
 
   PHP_ADD_INCLUDE(src)
-  PHP_ADD_INCLUDE(src/network/v3)
-
 
   PHP_NEW_EXTENSION(skywalking, \
       skywalking.cc \
@@ -172,10 +72,8 @@ if test "$PHP_SKYWALKING" != "no"; then
       src/sky_log.cc \
       src/sky_module.cc \
       src/sky_plugin_mysqli.cc \
-      src/sky_pdo.cc \
       src/sky_plugin_curl.cc \
       src/sky_plugin_error.cc \
-      src/sky_plugin_grpc.cc \
       src/sky_plugin_hyperf_guzzle.cc \
       src/sky_plugin_predis.cc \
       src/sky_plugin_rabbit_mq.cc \
@@ -188,12 +86,7 @@ if test "$PHP_SKYWALKING" != "no"; then
       src/sky_utils.cc \
       src/span.cc \
       src/tag.cc \
-      src/network/v3/common/Common_grpc.pb.cc \
-      src/network/v3/common/Common.pb.cc \
-      src/network/v3/language-agent/Tracing.pb.cc \
-      src/network/v3/language-agent/Tracing_grpc.pb.cc \
-      src/network/v3/management/Management_grpc.pb.cc \
-      src/network/v3/management/Management.pb.cc \
+      src/json_builder.cc \
   , $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1, cxx)
 fi
 

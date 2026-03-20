@@ -6,8 +6,8 @@ This document has detailed instructions on how to build SkyWalking PHP Agent fro
 
 ### Linux
 ```shell
-$ [sudo] apt-get install build-essential autoconf automake libtool curl make g++ unzip pkg-config
-$ [sudo] apt-get install cmake libboost-all-dev
+$ [sudo] apt-get install build-essential autoconf automake libtool g++
+$ [sudo] apt-get install libboost-all-dev
 ```
 
 ### MacOS
@@ -15,44 +15,25 @@ $ [sudo] apt-get install cmake libboost-all-dev
 On a Mac, you will first need to install Xcode or Command Line Tools for Xcode and then run the following command from a terminal:
 
 ```shell
- $ [sudo] xcode-select --install
-```
-
-To build gRPC from source, you may need to install the following packages from Homebrew:
-
-```shell
- $ brew install autoconf automake libtool shtool
+$ [sudo] xcode-select --install
 ```
 
 ### Alpine
 ```shell
- $ apk --update add --no-cache git ca-certificates autoconf automake libtool 
- $ apk --update add --no-cache cmake g++ make file linux-headers file re2c 
- $ apk --update add --no-cache pkgconf openssl openssl-dev curl curl-dev nginx boost-dev
-```
-
-## Build gRPC static library
-
-```shell
- $ git clone --depth 1 -b v1.34.x https://github.com/grpc/grpc.git /var/local/git/grpc
- $ cd /var/local/git/grpc
- $ git submodule update --init --recursive
- $ mkdir -p cmake/build
- $ cd cmake/build
- $ cmake ../..
- $ make -j$(nproc)
+$ apk add --no-cache git ca-certificates autoconf automake libtool g++ make file linux-headers boost-dev
 ```
 
 ## Build from source (PHP Extension)
 
-Use the `--with-grpc` option to set the path of the gRPC static library
-
-```shell script
-curl -Lo v4.2.0.tar.gz https://github.com/SkyAPM/SkyAPM-php-sdk/archive/v4.2.0.tar.gz
-tar zxvf v4.2.0.tar.gz
-cd SkyAPM-php-sdk-4.2.0
-phpize
-./configure --with-grpc="/var/local/git/grpc"
-make
-sudo make install
+```shell
+$ curl -Lo v4.2.0.tar.gz https://github.com/SkyAPM/SkyAPM-php-sdk/archive/v4.2.0.tar.gz
+$ tar zxvf v4.2.0.tar.gz
+$ cd SkyAPM-php-sdk-4.2.0
+$ phpize
+$ ./configure
+$ make -j$(nproc)
+$ sudo make install
 ```
+
+**Build time**: ~1-2 minutes (no external dependencies required)
+**Disk usage**: ~5MB (source code only)

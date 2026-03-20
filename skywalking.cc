@@ -53,11 +53,9 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("skywalking.version", "8", PHP_INI_ALL, OnUpdateLong, version, zend_skywalking_globals, skywalking_globals)
 	STD_PHP_INI_ENTRY("skywalking.app_code", "hello_skywalking", PHP_INI_ALL, OnUpdateString, app_code, zend_skywalking_globals, skywalking_globals)
 	STD_PHP_INI_ENTRY("skywalking.authentication", "", PHP_INI_ALL, OnUpdateString, authentication, zend_skywalking_globals, skywalking_globals)
-	STD_PHP_INI_ENTRY("skywalking.grpc", "127.0.0.1:11800", PHP_INI_ALL, OnUpdateString, grpc, zend_skywalking_globals, skywalking_globals)
-	STD_PHP_INI_BOOLEAN("skywalking.grpc_tls_enable", "0", PHP_INI_ALL, OnUpdateBool, grpc_tls_enable, zend_skywalking_globals, skywalking_globals)
-	STD_PHP_INI_ENTRY("skywalking.grpc_tls_pem_root_certs", "", PHP_INI_ALL, OnUpdateString, grpc_tls_pem_root_certs, zend_skywalking_globals, skywalking_globals)
-	STD_PHP_INI_ENTRY("skywalking.grpc_tls_pem_private_key", "", PHP_INI_ALL, OnUpdateString, grpc_tls_pem_private_key, zend_skywalking_globals, skywalking_globals)
-	STD_PHP_INI_ENTRY("skywalking.grpc_tls_pem_cert_chain", "", PHP_INI_ALL, OnUpdateString, grpc_tls_pem_cert_chain, zend_skywalking_globals, skywalking_globals)
+	STD_PHP_INI_ENTRY("skywalking.log_file_path", "/tmp/skywalking", PHP_INI_ALL, OnUpdateString, log_file_path, zend_skywalking_globals, skywalking_globals)
+	STD_PHP_INI_ENTRY("skywalking.log_file_max_size", "10485760", PHP_INI_ALL, OnUpdateLong, log_file_max_size, zend_skywalking_globals, skywalking_globals)
+	STD_PHP_INI_ENTRY("skywalking.log_file_max_files", "100", PHP_INI_ALL, OnUpdateLong, log_file_max_files, zend_skywalking_globals, skywalking_globals)
 
 	STD_PHP_INI_BOOLEAN("skywalking.log_enable", "0", PHP_INI_ALL, OnUpdateBool, log_enable, zend_skywalking_globals, skywalking_globals)
 	STD_PHP_INI_ENTRY("skywalking.log_path", "/tmp/skywalking-php.log", PHP_INI_ALL, OnUpdateString, log_path, zend_skywalking_globals, skywalking_globals)
@@ -78,12 +76,10 @@ static void php_skywalking_init_globals(zend_skywalking_globals *skywalking_glob
     skywalking_globals->version = 0;
     skywalking_globals->authentication = nullptr;
 
-    // tls
-    skywalking_globals->grpc = nullptr;
-    skywalking_globals->grpc_tls_enable = 0;
-    skywalking_globals->grpc_tls_pem_root_certs = nullptr;
-    skywalking_globals->grpc_tls_pem_private_key = nullptr;
-    skywalking_globals->grpc_tls_pem_cert_chain = nullptr;
+    // file logging
+    skywalking_globals->log_file_path = nullptr;
+    skywalking_globals->log_file_max_size = 10485760;  // 10MB
+    skywalking_globals->log_file_max_files = 100;
 
     // log
     skywalking_globals->log_enable = 0;

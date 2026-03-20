@@ -14,6 +14,23 @@ SkyAPM PHP
 
 **SkyAPM PHP** is the PHP instrumentation agent, which is compatible with [Apache SkyWalking](https://github.com/apache/skywalking) backend and others compatible agents/SDKs
 
+## Architecture
+
+SkyAPM PHP uses a file-based logging approach for distributed tracing. The extension intercepts PHP function calls and automatically collects traces without requiring application code changes.
+
+**Data Flow:**
+```
+PHP Request → Segment → JSON Serialization → Message Queue → File Logger → JSON Files → File Rotation
+```
+
+**Key Features:**
+- Zero external dependencies (no gRPC, no protobuf)
+- Native JSON serialization for direct compatibility
+- Automatic file rotation based on size and count
+- Standard JSON format compatible with SkyWalking
+- Compatible with Amazon Linux 1 (GCC 4.8.2+) and all modern systems
+- Fast build time (~1-2 minutes) and minimal disk footprint (~5MB)
+
 ## Support List
 1. CURL
 1. PDO

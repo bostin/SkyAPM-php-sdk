@@ -24,7 +24,7 @@
 
 #include <string>
 #include <vector>
-#include <src/network/v3/language-agent/Tracing.pb.h>
+#include "json_builder.h"
 #include "cross_process_bag.h"
 #include "span.h"
 

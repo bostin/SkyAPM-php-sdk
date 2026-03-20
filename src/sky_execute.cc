@@ -24,14 +24,12 @@
 #include "php_skywalking.h"
 
 #include "sky_plugin_predis.h"
-#include "sky_plugin_grpc.h"
 #include "sky_plugin_redis.h"
 #include "sky_plugin_memcached.h"
 #include "sky_plugin_yar.h"
 #include "sky_plugin_rabbit_mq.h"
 #include "sky_plugin_hyperf_guzzle.h"
 #include "sky_plugin_swoole_curl.h"
-#include "sky_pdo.h"
 #include "sky_plugin_mysqli.h"
 #include "sky_module.h"
 #include "segment.h"
@@ -88,9 +86,6 @@ void sky_execute_ex(zend_execute_data *execute_data) {
     if (class_name != nullptr && function_name != nullptr) {
         if (strcmp(function_name, "executeCommand") == 0) {
             span = sky_predis(execute_data, class_name, function_name);
-        } else if (strcmp(class_name, "Grpc\\BaseStub") == 0) {
-            afterExec = false;
-            span = sky_plugin_grpc(execute_data, class_name, function_name);
         } else if (strcmp(class_name, "PhpAmqpLib\\Channel\\AMQPChannel") == 0) {
             span = sky_plugin_rabbit_mq(execute_data, class_name, function_name);
         } else if ((SKY_STRCMP(class_name, "Hyperf\\Guzzle\\CoroutineHandler") ||
@@ -160,9 +155,7 @@ void sky_execute_internal(zend_execute_data *execute_data, zval *return_value) {
 
     Span *span = nullptr;
     if (class_name != nullptr) {
-        if (strcmp(class_name, "PDO") == 0 || strcmp(class_name, "PDOStatement") == 0) {
-            span = sky_pdo(execute_data, class_name, function_name);
-        } else if (strcmp(class_name, "mysqli") == 0){
+        if (strcmp(class_name, "mysqli") == 0){
             span = sky_plugin_mysqli(execute_data, class_name, function_name);
         } else if (strcmp(class_name, "Redis") == 0) {
             span = sky_plugin_redis(execute_data, class_name, function_name);
@@ -188,12 +181,7 @@ void sky_execute_internal(zend_execute_data *execute_data, zval *return_value) {
     if (span != nullptr) {
         // catch errors add to span log
         if (class_name != nullptr) {
-            if (strcmp(class_name, "PDO") == 0 || strcmp(class_name, "PDOStatement") == 0) {
-                if (Z_TYPE_P(return_value) == IS_FALSE) {
-                    span->setIsError(true);
-                    sky_pdo_check_errors(execute_data, span);
-                }
-            } else if (strcmp(class_name, "mysqli") == 0){
+            if (strcmp(class_name, "mysqli") == 0){
                 if (Z_TYPE_P(return_value) == IS_FALSE) { 
                     span->setIsError(true);  
                     sky_plugin_mysqli_check_errors(execute_data, span, 1);

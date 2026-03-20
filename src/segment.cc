@@ -22,7 +22,7 @@
 #include "segment.h"
 #include "manager.h"
 #include "cross_process_bag.h"
-#include "language-agent/Tracing.grpc.pb.h"
+#include "json_builder.h"
 
 Segment::Segment(const std::string &serviceId, const std::string &serviceInstanceId, int version,
                  const std::string &header) {
@@ -67,57 +67,93 @@ std::string Segment::marshal() {
         span->pushTag(new Tag("status_code", std::to_string(_status_code)));
     }
 
-    SegmentObject msg;
-    msg.set_traceid(_traceId);
-    msg.set_tracesegmentid(_traceSegmentId);
+    JsonBuilder json;
 
+    // 基本字段
+    json.addKeyValue("traceId", _traceId);
+    json.addKeyValue("traceSegmentId", _traceSegmentId);
+    json.addKeyValue("service", _serviceId);
+    json.addKeyValue("serviceInstance", _serviceInstanceId);
+    json.addKeyValue("isSizeLimited", _isSizeLimited);
+
+    // Spans 数组
+    json.startArray("spans");
     for (auto span: spans) {
-        auto _span = msg.add_spans();
-        _span->set_spanid(span->getSpanId());
-        _span->set_parentspanid(span->getParentSpanId());
-        _span->set_starttime(span->getStartTime());
-        _span->set_endtime(span->getEndTime());
+        json.startObject();
 
-        for (auto ref:span->getRefs()) {
-            auto _ref = _span->add_refs();
-            _ref->set_reftype(static_cast<RefType>(ref->getRefType()));
-            _ref->set_traceid(ref->getTraceId());
-            _ref->set_parenttracesegmentid(ref->getParentTraceSegmentId());
-            _ref->set_parentspanid(ref->getParentSpanId());
-            _ref->set_parentservice(ref->getParentService());
-            _ref->set_parentserviceinstance(ref->getParentServiceInstance());
-            _ref->set_parentendpoint(ref->getParentEndpoint());
-            _ref->set_networkaddressusedatpeer(ref->getNetworkAddressUsedAtPeer());
+        // Span 基本字段
+        json.addKeyValue("spanId", span->getSpanId());
+        json.addKeyValue("parentSpanId", span->getParentSpanId());
+        json.addKeyValue("startTime", span->getStartTime());
+        json.addKeyValue("endTime", span->getEndTime());
+        json.addKeyValue("operationName", span->getOperationName());
+
+        // Peer
+        if (!span->getPeer().empty()) {
+            json.addKeyValue("peer", span->getPeer());
         }
 
-        _span->set_operationname(span->getOperationName());
-        _span->set_peer(span->getPeer());
-        _span->set_spantype(static_cast<SpanType>(span->getSpanType()));
-        _span->set_spanlayer(static_cast<SpanLayer>(span->getSpanLayer()));
-        _span->set_componentid(span->getComponentId());
-        _span->set_iserror(span->getIsError());
+        // Span Type
+        json.addKeyValue("spanType", static_cast<int>(span->getSpanType()));
+        json.addKeyValue("spanLayer", static_cast<int>(span->getSpanLayer()));
+        json.addKeyValue("componentId", span->getComponentId());
 
-        for (auto tag:span->getTags()) {
-            auto _tag = _span->add_tags();
-            _tag->set_key(tag->getKey());
-            _tag->set_value(tag->getValue());
+        // Error flag
+        json.addKeyValue("isError", span->getIsError());
+        json.addKeyValue("skipAnalysis", span->getSkipAnalysis());
+
+        // Tags
+        if (!span->getTags().empty()) {
+            json.startArray("tags");
+            for (auto& tag: span->getTags()) {
+                json.startObject();
+                json.addKeyValue("key", tag->getKey());
+                json.addKeyValue("value", tag->getValue());
+                json.endObject();
+            }
+            json.endArray();
         }
 
-        for (auto log:span->getLogs()) {
-            auto _log = _span->add_logs();
-            _log->set_time(log->getTime());
-            auto data = _log->add_data();
-            data->set_key(log->getKey());
-            data->set_value(log->getValue());
+        // Logs
+        if (!span->getLogs().empty()) {
+            json.startArray("logs");
+            for (auto& log: span->getLogs()) {
+                json.startObject();
+                json.addKeyValue("time", log->getTime());
+                json.startArray("data");
+                json.startObject();
+                json.addKeyValue("key", log->getKey());
+                json.addKeyValue("value", log->getValue());
+                json.endObject();
+                json.endArray();
+                json.endObject();
+            }
+            json.endArray();
         }
 
-        _span->set_skipanalysis(span->getSkipAnalysis());
+        // References
+        if (!span->getRefs().empty()) {
+            json.startArray("refs");
+            for (auto& ref: span->getRefs()) {
+                json.startObject();
+                json.addKeyValue("refType", ref->getRefType());
+                json.addKeyValue("traceId", ref->getTraceId());
+                json.addKeyValue("parentTraceSegmentId", ref->getParentTraceSegmentId());
+                json.addKeyValue("parentSpanId", ref->getParentSpanId());
+                json.addKeyValue("parentService", ref->getParentService());
+                json.addKeyValue("parentServiceInstance", ref->getParentServiceInstance());
+                json.addKeyValue("parentEndpoint", ref->getParentEndpoint());
+                json.addKeyValue("networkAddressUsedAtPeer", ref->getNetworkAddressUsedAtPeer());
+                json.endObject();
+            }
+            json.endArray();
+        }
+
+        json.endObject();
     }
+    json.endArray();
 
-    msg.set_service(_serviceId);
-    msg.set_serviceinstance(_serviceInstanceId);
-    msg.set_issizelimited(false);
-    return msg.SerializeAsString();
+    return json.toString();
 }
 
 void Segment::setStatusCode(int code) {

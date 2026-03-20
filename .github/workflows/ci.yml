@@ -32,14 +32,8 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
         php-version: ['7.0', '7.1', '7.2', '7.3', '7.4', '8.0']
-        skywalking-version: ['8.5.0-es6', '8.4.0-es6', '8.3.0-es6', '8.2.0-es6', '8.1.0-es6', '8.0.1-es6', '8.0.0-es6']
-    name: PHP ${{ matrix.php-version }} Test on SW ${{ matrix.skywalking-version }}
+    name: PHP ${{ matrix.php-version }} Test
     services:
-      skywalking:
-        image: apache/skywalking-oap-server:${{ matrix.skywalking-version }}
-        ports:
-          - 11800:11800
-          - 12800:12800
       mysql:
         image: mysql:5
         ports:
@@ -66,22 +60,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cache gRPC
-        id: cache-grpc
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/work/SkyAPM-php-sdk/SkyAPM-php-sdk/grpc
-          key: ${{ runner.os }}-grpc-v1
-
-      - name: Checkout GRPC
-        if: steps.cache-grpc.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
-        with:
-          ref: v1.31.x
-          repository: grpc/grpc
-          path: grpc
-          submodules: true
-
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         env:
@@ -95,8 +73,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y curl libcurl4-openssl-dev nginx
-          sudo apt-get install -y build-essential autoconf libtool pkg-config cmake
-          sudo apt-get install -y autoconf automake libtool curl make g++ unzip libboost-all-dev
+          sudo apt-get install -y build-essential autoconf libtool pkg-config
           if ! [ -e /usr/bin/php-fpm ]; then
             sudo apt-get install -y php${{ matrix.php-version }}-fpm
             sudo cp /usr/sbin/php-fpm${{ matrix.php-version }} /usr/bin/php-fpm
@@ -105,21 +82,11 @@ jobs:
           composer install
           cd ..
 
-      - name: Build GRPC
-        if: steps.cache-grpc.outputs.cache-hit != 'true'
-        run: |
-          cd /home/runner/work/SkyAPM-php-sdk/SkyAPM-php-sdk/grpc
-          mkdir -p cmake/build
-          cd cmake/build
-          cmake ../..
-          make -j$(nproc)
-          cd /home/runner/work/SkyAPM-php-sdk/SkyAPM-php-sdk
-
       - name: Build SkyWalking-PHP
         run: |
           cd /home/runner/work/SkyAPM-php-sdk/SkyAPM-php-sdk
           phpize
-          ./configure --with-grpc=/home/runner/work/SkyAPM-php-sdk/SkyAPM-php-sdk/grpc
+          ./configure
           make -j$(nproc)
           sudo make install
 

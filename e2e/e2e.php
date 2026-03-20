@@ -18,79 +18,11 @@
 require_once __DIR__ . '/vendor/autoload.php';
 
 class E2E {
-//     public $url = "http://122.112.182.72:8080/graphql";
-    public $url = "http://127.0.0.1:12800/graphql";
-    public $servicesQuery = <<<'GRAPHQL'
-query queryServices($duration: Duration!,$keyword: String!) {
-    services: searchServices(duration: $duration, keyword: $keyword) {
-        key: id
-        label: name
-    }
-}
-GRAPHQL;
-
-    public $metricsQuery = <<<'GRAPHQL'
-query ($id: ID!, $duration: Duration!) {
-    metrics: getLinearIntValues(metric: {
-        name: "{metricsName}"
-        id: $id
-    }, duration: $duration) {
-       values {
-           value
-       }
-    }
-}
-GRAPHQL;
-
-    public $instanceQuery = <<<'GRAPHQL'
-query queryInstances($serviceId: ID!, $duration: Duration!) {
-    instances: getServiceInstances(duration: $duration, serviceId: $serviceId) {
-        key: id
-        label: name
-        attributes {
-            name
-            value
-        }
-        instanceUUID
-    }
-}
-GRAPHQL;
-
-
+    public $logDir = '/tmp/skywalking_test';
     public $startTime;
 
-    public $allServiceMetrics = [
-        'service_sla',
-        'service_cpm',
-        'service_resp_time',
-        'service_apdex'
-    ];
-
     public function __construct() {
-        $this->startTime = time() - 15 * 60;
-    }
-
-    public function query($query, $variables) {
-        $client = new \GuzzleHttp\Client();
-
-        $json = [
-            'query' => $query,
-            'variables' => $variables
-        ];
-
-        $this->info("query request body: " . json_encode($json));
-        $res = $client->request("POST", $this->url, [
-            'json' => $json
-        ]);
-
-        $this->info("query response status code: " . $res->getStatusCode());
-        if ($res->getStatusCode() != 200) {
-            return "";
-        }
-
-        $body = $res->getBody()->getContents();
-        $this->info("query response body: " . $body);
-        return $body;
+        $this->startTime = time();
     }
 
     public function info($msg) {
@@ -106,131 +38,130 @@ GRAPHQL;
         return true;
     }
 
-    public function verifyServices() {
-        $variables = [
-            'duration' => [
-                "start" => date("Y-m-d His", $this->startTime),
-                "end" => date("Y-m-d His"),
-                "step" => "SECOND"
-            ],
-            "keyword" => ""
-        ];
-        $res = $this->query($this->servicesQuery, $variables);
-        if (!empty($res)) {
-            $data = json_decode($res, true);
-            if (count($data['data']['services']) <= 0) {
-                return false;
-            }
-
-            $found = false;
-            foreach ($data['data']['services'] as $service) {
-
-                if ($service['label'] == "skywalking") {
-                    $found = true;
-                    if (!$this->verifyServiceMetrics($service)) {
-                        return false;
-                    }
-
-                    $instances = $this->verifyServiceInstances($service);
-                    if ($instances === false) {
-                        return false;
-                    }
+    public function cleanup() {
+        // Clean up old test log files
+        $files = glob($this->logDir . '/*.json');
+        if (is_array($files)) {
+            foreach ($files as $file) {
+                if (filemtime($file) < $this->startTime) {
+                    @unlink($file);
                 }
             }
-            if (!$found) {
-                return false;
-            }
-            return true;
         }
-
-        return false;
     }
 
-    public function verifyServiceMetrics($service) {
+    public function verifyTraces() {
+        // Wait for files to be written
+        sleep(2);
 
-        foreach ($this->allServiceMetrics as $metrics) {
-            $key = $service['key'];
-            $label = $service['label'];
-            $this->info("verifying service ($key:$label), metrics: $metrics");
+        // Get all JSON files in log directory
+        $files = glob($this->logDir . '/*.json');
+        if (empty($files)) {
+            $this->info('No JSON files found in ' . $this->logDir);
+            return false;
+        }
 
-            $variables = [
-                'duration' => [
-                    "start" => date("Y-m-d Hi", $this->startTime),
-                    "end" => date("Y-m-d Hi"),
-                    "step" => "MINUTE"
-                ],
-                "id" => $key
-            ];
-            $query = str_replace("{metricsName}", $metrics, $this->metricsQuery);
+        $this->info('Found ' . count($files) . ' JSON trace files');
 
-            $res = $this->query($query, $variables);
-            if (!empty($res)) {
-                $data = json_decode($res, true);
-                if (count($data['data']['metrics']['values']) > 0) {
-                    $check = false;
-                    foreach ($data['data']['metrics']['values'] as $item) {
-                        if ($item['value'] > 0) {
-                            $check = true;
-                            break;
-                        }
-                    }
-                    if (!$check) {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            } else {
-                return false;
+        // Verify each JSON file
+        $validTraces = 0;
+        foreach ($files as $file) {
+            $content = file_get_contents($file);
+            if ($content === false) {
+                $this->info('Failed to read file: ' . $file);
+                continue;
             }
+
+            $json = json_decode($content, true);
+            if ($json === null) {
+                $this->info('Invalid JSON in file: ' . $file . ' - ' . json_last_error_msg());
+                continue;
+            }
+
+            // Verify required fields
+            if (!isset($json['traceId'])) {
+                $this->info('Missing traceId in file: ' . $file);
+                continue;
+            }
+
+            if (!isset($json['traceSegmentId'])) {
+                $this->info('Missing traceSegmentId in file: ' . $file);
+                continue;
+            }
+
+            if (!isset($json['service']) || $json['service'] !== 'skywalking') {
+                $this->info('Invalid or missing service in file: ' . $file);
+                continue;
+            }
+
+            if (!isset($json['spans']) || !is_array($json['spans'])) {
+                $this->info('Missing or invalid spans in file: ' . $file);
+                continue;
+            }
+
+            // Verify at least one span exists
+            if (count($json['spans']) == 0) {
+                $this->info('No spans found in file: ' . $file);
+                continue;
+            }
+
+            // Verify span structure
+            foreach ($json['spans'] as $span) {
+                if (!isset($span['operationName'])) {
+                    $this->info('Missing operationName in span');
+                    continue 2;
+                }
+                if (!isset($span['spanType'])) {
+                    $this->info('Missing spanType in span');
+                    continue 2;
+                }
+                if (!isset($span['spanId'])) {
+                    $this->info('Missing spanId in span');
+                    continue 2;
+                }
+            }
+
+            $validTraces++;
+        }
+
+        $this->info("Found $validTraces valid trace files");
+
+        return $validTraces > 0;
+    }
+
+    public function verifyJsonStructure() {
+        $files = glob($this->logDir . '/*.json');
+        if (empty($files)) {
+            return false;
+        }
+
+        // Read and validate one file structure in detail
+        $content = file_get_contents($files[0]);
+        $json = json_decode($content, true);
+
+        // Check for optional arrays
+        if (isset($json['tags']) && !is_array($json['tags'])) {
+            $this->info('tags should be an array');
+            return false;
+        }
+
+        if (isset($json['logs']) && !is_array($json['logs'])) {
+            $this->info('logs should be an array');
+            return false;
+        }
+
+        if (isset($json['refs']) && !is_array($json['refs'])) {
+            $this->info('refs should be an array');
+            return false;
         }
 
         return true;
     }
-
-    public function verifyServiceInstances($service) {
-
-        $key = $service['key'];
-        $label = $service['label'];
-        $this->info("verifying instance ($key:$label)");
-
-        $variables = [
-            'duration' => [
-                "start" => date("Y-m-d His", $this->startTime),
-                "end" => date("Y-m-d His"),
-                "step" => "SECOND"
-            ],
-            "serviceId" => $key
-        ];
-
-        $res = $this->query($this->instanceQuery, $variables);
-        if (!empty($res)) {
-            $data = json_decode($res, true);
-
-            if (count($data['data']['instances']) > 0) {
-                foreach ($data['data']['instances'] as $instance) {
-                    $status = $instance['key'] == '' or $instance['label'] == '';
-                    if ($status) {
-                        return false;
-                    } else {
-                        foreach ($instance['attributes'] as $attr) {
-                            if ($attr['value'] == '') {
-                                return false;
-                            }
-                        }
-                    }
-                }
-                return $data['data']['instances'];
-            }
-            return false;
-        } else {
-            return false;
-        }
-    }
 }
 
-$check = ['verifyServices'];
+$check = ['verifyTraces', 'verifyJsonStructure'];
 $e2e = new E2E();
+$e2e->cleanup();
 
 foreach($check as $func) {
     $e2e->info('php version:' . $argv[1]);
@@ -255,6 +186,7 @@ foreach($check as $func) {
     if (!$status) {
         $e2e->info("test $func fail...");
         echo(file_get_contents("/var/log/php" . $argv[1] . "-fpm.log"));
+        echo(file_get_contents("/tmp/skywalking-php.log"));
         system("sudo chmod -R +rwx /var/crash/*");
         exit(2);
     }

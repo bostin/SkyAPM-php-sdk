@@ -28,12 +28,9 @@
 #include <random>
 #include <fstream>
 #include <queue>
-#include "management/Management.grpc.pb.h"
-#include "language-agent/Tracing.grpc.pb.h"
-#include "grpc/grpc.h"
-#include "grpc++/grpc++.h"
+#include <sys/stat.h>
+#include <chrono>
 #include "segment.h"
-#include <google/protobuf/util/json_util.h>
 #include "common.h"
 #include "sky_shm.h"
 #include <boost/interprocess/ipc/message_queue.hpp>
@@ -41,158 +38,101 @@
 #include "php_skywalking.h"
 #include "sky_log.h"
 
-std::queue<std::string> messageQueue;
-static pthread_mutex_t mx = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t cond_mx = PTHREAD_MUTEX_INITIALIZER;
-
 extern struct service_info *s_info;
 
 static std::string fixed_uuid;
+
+void Manager::setupServiceInfo(const ManagerOptions &options, struct service_info *info) {
+    if (info == nullptr) {
+        return;
+    }
+
+    auto ips = getIps();
+    std::string instance;
+    if (!ips.empty()) {
+        if (!options.instance_name.empty()) {
+            instance = options.instance_name;
+        } else {
+            instance = generateUUID() + "@" + ips[0];
+        }
+    }
+
+    strcpy(info->service, options.code.c_str());
+    strcpy(info->service_instance, instance.c_str());
+}
 
 void Manager::init(const ManagerOptions &options, struct service_info *info) {
     if (!options.instance_name.empty()) {
         fixed_uuid = options.instance_name;
     }
 
-    std::thread th(login, options, info);
-    th.detach();
+    // 直接设置服务信息，无需 gRPC 登录
+    setupServiceInfo(options, info);
 
+    // 启动文件写入线程
     std::thread c(consumer, options);
     c.detach();
 
-    sky_log("the apache skywalking php plugin mounted");
-}
-
-void Manager::login(const ManagerOptions &options, struct service_info *info) {
-
-    std::shared_ptr<grpc::Channel> channel(grpc::CreateChannel(options.grpc, getCredentials(options)));
-    std::unique_ptr<ManagementService::Stub> stub(ManagementService::NewStub(channel));
-
-    bool status = false;
-
-    while (!status) {
-        grpc::ClientContext context;
-        InstanceProperties properties;
-        Commands commands;
-        if (!options.authentication.empty()) {
-            context.AddMetadata("authentication", options.authentication);
-        }
-
-        auto ips = getIps();
-
-        std::string instance;
-        if (!ips.empty()) {
-            // todo port
-            if (!options.instance_name.empty()) {
-                instance = generateUUID();
-            } else {
-                instance = generateUUID() + "@" + ips[0];
-            }
-        }
-
-        properties.set_service(options.code);
-        properties.set_serviceinstance(instance);
-        auto osName = properties.add_properties();
-        osName->set_key("os_name");
-        osName->set_value(PLATFORM_NAME);
-
-        char name[256] = {0};
-        gethostname(name, sizeof(name));
-        auto hostName = properties.add_properties();
-        hostName->set_key("host_name");
-        hostName->set_value(name);
-
-        std::ostringstream strPid;
-        strPid << getpid();
-        auto pid = properties.add_properties();
-        pid->set_key("process_no");
-        pid->set_value(strPid.str());
-
-        auto language = properties.add_properties();
-        language->set_key("language");
-        language->set_value("php");
-
-        for (const auto &ip:ips) {
-            auto tmp = properties.add_properties();
-            tmp->set_key("ipv4");
-            tmp->set_value(ip);
-        }
-        std::string msg = properties.SerializeAsString();
-        auto rc = stub->reportInstanceProperties(&context, properties, &commands);
-        if (rc.ok() && info != nullptr) {
-            strcpy(info->service, options.code.c_str());
-            strcpy(info->service_instance, instance.c_str());
-            std::thread h(heartbeat, options, instance);
-            h.detach();
-        }
-        status = rc.ok();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-}
-
-[[noreturn]] void Manager::heartbeat(const ManagerOptions &options, const std::string &serviceInstance) {
-    std::shared_ptr<grpc::Channel> channel(grpc::CreateChannel(options.grpc, getCredentials(options)));
-    std::unique_ptr<ManagementService::Stub> stub(ManagementService::NewStub(channel));
-
-    while (true) {
-        grpc::ClientContext context;
-        InstancePingPkg ping;
-        Commands commands;
-        if (!options.authentication.empty()) {
-            context.AddMetadata("authentication", options.authentication);
-        }
-        ping.set_service(options.code);
-        ping.set_serviceinstance(serviceInstance);
-
-        stub->keepAlive(&context, ping, &commands);
-
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
+    sky_log("the apache skywalking php plugin mounted (file logging mode)");
 }
 
 [[noreturn]] void Manager::consumer(const ManagerOptions &options) {
-    while (true) {
-        std::shared_ptr<grpc::Channel> channel(grpc::CreateChannel(options.grpc, getCredentials(options)));
-        std::unique_ptr<TraceSegmentReportService::Stub> stub(TraceSegmentReportService::NewStub(channel));
-        grpc::ClientContext context;
-        Commands commands;
+    // 创建日志目录
+    mkdir(options.log_file_path.c_str(), 0755);
 
-        if (!options.authentication.empty()) {
-            context.AddMetadata("authentication", options.authentication);
-        }
-        auto writer = stub->collect(&context, &commands);
+    std::vector<std::string> file_list;
 
-        try {
-            boost::interprocess::message_queue mq(boost::interprocess::open_only, s_info->mq_name);
+    try {
+        boost::interprocess::message_queue mq(boost::interprocess::open_only, s_info->mq_name);
 
-            while (true) {
-                std::string data;
-                data.resize(SKYWALKING_G(mq_max_message_length));
-                size_t msg_size;
-                unsigned msg_priority;
-                mq.receive(&data[0], data.size(), msg_size, msg_priority);
-                data.resize(msg_size);
+        while (true) {
+            std::string data;
+            data.resize(SKYWALKING_G(mq_max_message_length));
+            size_t msg_size;
+            unsigned msg_priority;
+            mq.receive(&data[0], data.size(), msg_size, msg_priority);
+            data.resize(msg_size);
 
-                std::string json_str;
-                SegmentObject msg;
-                msg.ParseFromString(data);
-                google::protobuf::util::JsonPrintOptions opt;
-                opt.always_print_primitive_fields = true;
-                opt.preserve_proto_field_names = true;
-                google::protobuf::util::MessageToJsonString(msg, &json_str, opt);
-                bool status = writer->Write(msg);
-                if (status) {
-                    sky_log("write success " + json_str);
-                } else {
-                    sky_log("write fail " + json_str);
-                    break;
+            // data 已经是 JSON 格式，直接使用
+            std::string json_str = data;
+
+            // 从 JSON 中提取 traceId（简单解析，取第一个 "traceId":"..." 的值）
+            size_t traceIdPos = json_str.find("\"traceId\":\"");
+            std::string traceIdShort = "unknown";
+            if (traceIdPos != std::string::npos) {
+                size_t start = traceIdPos + 11; // 跳过 "traceId":"
+                size_t end = json_str.find("\"", start);
+                if (end != std::string::npos) {
+                    traceIdShort = json_str.substr(start, std::min(end - start, size_t(8)));
                 }
             }
-        } catch (boost::interprocess::interprocess_exception &ex) {
-            sky_log(ex.what());
-            php_error(E_WARNING, "%s %s", "[skywalking] open queue fail ", ex.what());
+
+            // 生成文件名: skywalking-{timestamp}-{traceid}.json
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            std::string filename = options.log_file_path + "/skywalking-" +
+                std::to_string(now) + "-" + traceIdShort + ".json";
+
+            // 写入文件
+            std::ofstream outfile(filename);
+            outfile << json_str;
+            outfile.close();
+
+            sky_log("write trace to file: " + filename);
+
+            // 文件轮转
+            file_list.push_back(filename);
+            if (file_list.size() > options.log_file_max_files) {
+                std::string old_file = file_list.front();
+                file_list.erase(file_list.begin());
+                if (remove(old_file.c_str()) == 0) {
+                    sky_log("removed old file: " + old_file);
+                }
+            }
         }
+    } catch (boost::interprocess::interprocess_exception &ex) {
+        sky_log(ex.what());
+        php_error(E_WARNING, "%s %s", "[skywalking] consumer error ", ex.what());
     }
 }
 
@@ -220,24 +160,6 @@ std::vector<std::string> Manager::getIps() {
     freeifaddrs(interfaces);
 
     return ips;
-}
-
-std::shared_ptr<grpc::ChannelCredentials> Manager::getCredentials(const ManagerOptions &options) {
-    std::shared_ptr<grpc::ChannelCredentials> creds;
-    if (options.grpc_tls == true) {
-        if (options.cert_chain.empty() && options.private_key.empty()) {
-            creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
-        } else {
-            grpc::SslCredentialsOptions opts;
-            opts.pem_cert_chain = options.cert_chain;
-            opts.pem_root_certs = options.root_certs;
-            opts.pem_private_key = options.private_key;
-            creds = grpc::SslCredentials(opts);
-        }
-    } else {
-        creds = grpc::InsecureChannelCredentials();
-    }
-    return creds;
 }
 
 std::string Manager::generateUUID() {

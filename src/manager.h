@@ -22,8 +22,6 @@
 
 #include <string>
 #include <vector>
-#include "grpc/grpc.h"
-#include "grpc++/grpc++.h"
 
 #if (defined(unix) || defined(__unix__) || defined(__unix)) && !defined(__APPLE__)
 #define PLATFORM_NAME "Unix"
@@ -40,11 +38,9 @@
 struct ManagerOptions {
     int version;
     std::string code;
-    std::string grpc;
-    bool grpc_tls;
-    std::string root_certs;
-    std::string private_key;
-    std::string cert_chain;
+    std::string log_file_path;
+    int log_file_max_size;
+    int log_file_max_files;
     std::string authentication;
     std::string instance_name;
 };
@@ -59,17 +55,13 @@ public:
 private:
     Manager() = delete;
 
-    static void login(const ManagerOptions &options, struct service_info *info);
-
-    [[noreturn]] static void heartbeat(const ManagerOptions &options, const std::string &serviceInstance);
+    static void setupServiceInfo(const ManagerOptions &options, struct service_info *info);
 
     [[noreturn]] static void consumer(const ManagerOptions &options);
 
     static void logger(const std::string &log);
 
     static std::vector<std::string> getIps();
-
-    static std::shared_ptr<grpc::ChannelCredentials> getCredentials(const ManagerOptions &options);
 };
 
 

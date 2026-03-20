@@ -99,11 +99,9 @@ void sky_module_init() {
     ManagerOptions opt;
     opt.version = SKYWALKING_G(version);
     opt.code = SKYWALKING_G(app_code);
-    opt.grpc = SKYWALKING_G(grpc);
-    opt.grpc_tls = SKYWALKING_G(grpc_tls_enable);
-    opt.root_certs = SKYWALKING_G(grpc_tls_pem_root_certs);
-    opt.private_key = SKYWALKING_G(grpc_tls_pem_private_key);
-    opt.cert_chain = SKYWALKING_G(grpc_tls_pem_cert_chain);
+    opt.log_file_path = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
+    opt.log_file_max_size = SKYWALKING_G(log_file_max_size);
+    opt.log_file_max_files = SKYWALKING_G(log_file_max_files);
     opt.authentication = SKYWALKING_G(authentication);
     opt.instance_name = SKYWALKING_G(instance_name);
 

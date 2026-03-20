@@ -56,7 +56,6 @@ SKY_BEGIN_EXTERN_C()
 #include "ext/curl/php_curl.h"
 #endif
 #include "zend_interfaces.h"
-#include "ext/pdo/php_pdo_driver.h"
 #include "ext/standard/php_var.h"
 
 #include "zend_smart_str.h"
@@ -119,7 +118,6 @@ PHP_MINFO_FUNCTION (skywalking);
 ZEND_BEGIN_MODULE_GLOBALS(skywalking)
     char *authentication;
     char *app_code;
-    char *grpc;
     zend_bool enable;
     zval context;
     zval curl_header;
@@ -128,11 +126,10 @@ ZEND_BEGIN_MODULE_GLOBALS(skywalking)
     void *segment;
     zend_bool is_swoole;
 
-    // tls
-    zend_bool grpc_tls_enable;
-    char *grpc_tls_pem_root_certs;
-    char *grpc_tls_pem_private_key;
-    char *grpc_tls_pem_cert_chain;
+    // file logging
+    char *log_file_path;
+    zend_long log_file_max_size;
+    zend_long log_file_max_files;
 
     // log
     zend_bool log_enable;

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(find src:*)",
+      "Bash(brew upgrade:*)",
+      "Bash(git checkout:*)"
+    ]
+  }
+}

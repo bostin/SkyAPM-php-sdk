@@ -103,14 +103,10 @@
 			<file role="src" name="src/sky_log.h"/>
 			<file role="src" name="src/sky_module.cc"/>
 			<file role="src" name="src/sky_module.h"/>
-			<file role="src" name="src/sky_pdo.cc"/>
-			<file role="src" name="src/sky_pdo.h"/>
 			<file role="src" name="src/sky_plugin_curl.cc"/>
 			<file role="src" name="src/sky_plugin_curl.h"/>
 			<file role="src" name="src/sky_plugin_error.cc"/>
 			<file role="src" name="src/sky_plugin_error.h"/>
-			<file role="src" name="src/sky_plugin_grpc.cc"/>
-			<file role="src" name="src/sky_plugin_grpc.h"/>
 			<file role="src" name="src/sky_plugin_hyperf_guzzle.cc"/>
 			<file role="src" name="src/sky_plugin_hyperf_guzzle.h"/>
 			<file role="src" name="src/sky_plugin_memcached.cc"/>
