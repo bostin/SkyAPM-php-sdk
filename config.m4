@@ -40,10 +40,12 @@ fi
 # SQLite 3 library (OPTIONAL - for SQLite storage backend)
 # If SQLite is not available, the extension will fall back to JSON file storage
 AC_MSG_CHECKING([for sqlite3 library (optional)])
+SQLITE3_ENABLED=no
 PHP_CHECK_LIBRARY(sqlite3, sqlite3_open,
   [
     PHP_ADD_LIBRARY_WITH_PATH(sqlite3, $SQLITE3_DIR/lib, SKYWALKING_SHARED_LIBADD)
     AC_DEFINE(HAVE_SQLITE3, 1, [Whether you have SQLite3])
+    SQLITE3_ENABLED=yes
     AC_MSG_RESULT([found - SQLite storage backend enabled])
   ],[
     AC_MSG_RESULT([not found - SQLite storage backend disabled, will use JSON file storage])
@@ -77,8 +79,8 @@ if test "$PHP_SKYWALKING" != "no"; then
 
   PHP_ADD_INCLUDE(src)
 
-  PHP_NEW_EXTENSION(skywalking, \
-      skywalking.cc \
+  # 构建源文件列表（根据 SQLite 支持动态调整）
+  SKYWALKING_SOURCES="skywalking.cc \
       src/base64.cc \
       src/cross_process_bag.cc \
       src/manager.cc \
@@ -104,9 +106,14 @@ if test "$PHP_SKYWALKING" != "no"; then
       src/span.cc \
       src/tag.cc \
       src/json_builder.cc \
-      src/storage/sqlite_storage.cc \
-      src/storage/json_storage.cc \
-  , $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1, cxx)
+      src/storage/json_storage.cc"
+
+  # 如果 SQLite 可用，添加 SQLite 存储源文件
+  if test "$SQLITE3_ENABLED" = "yes"; then
+    SKYWALKING_SOURCES="$SKYWALKING_SOURCES src/storage/sqlite_storage.cc"
+  fi
+
+  PHP_NEW_EXTENSION(skywalking, $SKYWALKING_SOURCES, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1, cxx)
 fi
 
 if test -r $phpincludedir/ext/mysqli/mysqli_mysqlnd.h; then
