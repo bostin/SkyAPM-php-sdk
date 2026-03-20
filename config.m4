@@ -51,6 +51,9 @@ if test "$PHP_SKYWALKING" != "no"; then
       PHP_ADD_LIBRARY(c++,1,SKYWALKING_SHARED_LIBADD)
       ;;
     *)
+      # Linux: 链接 C++ 标准库（解决 GCC 4.8 std::regex 问题）
+      PHP_ADD_LIBRARY(stdc++,,SKYWALKING_SHARED_LIBADD)
+      PHP_ADD_LIBRARY(stdc++)
       PHP_ADD_LIBRARY(rt,,SKYWALKING_SHARED_LIBADD)
       PHP_ADD_LIBRARY(rt)
       ;;

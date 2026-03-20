@@ -19,9 +19,10 @@
 
 #include "cross_process_bag.h"
 #include "base64.h"
-#include <regex>
 #include <iostream>
 #include <utility>
+#include <sstream>
+#include <vector>
 
 CrossProcessBag::CrossProcessBag(std::string serviceId,
                                  std::string serviceInstanceId,
@@ -37,18 +38,22 @@ CrossProcessBag::CrossProcessBag(std::string serviceId,
     decode(header);
 }
 
-void CrossProcessBag::decode(const std::string &h) {
+// 简单的字符串分割函数，替代 std::regex（GCC 4.8 不支持）
+static std::vector<std::string> split_string(const std::string &str, char delimiter) {
+    std::vector<std::string> tokens;
+    std::stringstream ss(str);
+    std::string token;
 
-    std::regex ws_re;
-    switch (version) {
-        case VERSION_8:
-            ws_re = "-";
-            break;
+    while (std::getline(ss, token, delimiter)) {
+        tokens.push_back(token);
     }
 
+    return tokens;
+}
 
-    std::vector<std::string> header_bag(std::sregex_token_iterator(h.begin(), h.end(), ws_re, -1),
-                                        std::sregex_token_iterator());
+void CrossProcessBag::decode(const std::string &h) {
+    // 使用简单字符串分割替代正则表达式（兼容 GCC 4.8）
+    std::vector<std::string> header_bag = split_string(h, '-');
 
     if (header_bag.size() >= 8) {
         sample = std::stoi(header_bag[0]);
