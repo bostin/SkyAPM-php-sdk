@@ -194,13 +194,32 @@ void sky_request_init(zval *request, uint64_t request_id) {
     std::unordered_map<uint64_t, Segment *> *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>SKYWALKING_G(segment);
 
     auto *segment = new Segment(s_info->service, s_info->service_instance, SKYWALKING_G(version), header);
-    (void)sky_insert_segment(request_id, segment);
 
-    auto *span = segments->at(request_id)->createSpan(SkySpanType::Entry, SkySpanLayer::Http, 8001);
+    // 插入 segment 并检查是否成功
+    if (!sky_insert_segment(request_id, segment)) {
+        sky_log("sky_request_init: failed to insert segment, request_id=" + std::to_string(request_id) + " already exists");
+        delete segment;
+        return;
+    }
+
+    // 获取刚插入的 segment（使用 find 而不是 at，避免异常）
+    auto it = segments->find(request_id);
+    if (it == segments->end()) {
+        sky_log("sky_request_init: segment not found after insert");
+        return;
+    }
+
+    auto *seg = it->second;
+    auto *span = seg->createSpan(SkySpanType::Entry, SkySpanLayer::Http, 8001);
+    if (span == nullptr) {
+        sky_log("sky_request_init: failed to create span");
+        return;
+    }
+
     span->setOperationName(uri);
     span->setPeer(peer);
     span->addTag("url", uri);
-    segments->at(request_id)->createRefs();
+    seg->createRefs();
 
     zval *request_method = zend_hash_str_find(Z_ARRVAL(PG(http_globals)[TRACK_VARS_SERVER]), ZEND_STRL("REQUEST_METHOD"));
     if (request_method != NULL) {
@@ -224,8 +243,9 @@ static void write_trace_to_file(const std::string &json_str) {
     if (traceIdPos != std::string::npos) {
         size_t start = traceIdPos + 11; // 跳过 "traceId":"
         size_t end = json_str.find("\"", start);
-        if (end != std::string::npos) {
-            traceIdShort = json_str.substr(start, std::min(end - start, size_t(8)));
+        if (end != std::string::npos && end > start) {
+            size_t len = std::min(end - start, size_t(8));
+            traceIdShort = json_str.substr(start, len);
         }
     }
 

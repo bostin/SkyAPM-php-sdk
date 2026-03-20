@@ -34,8 +34,9 @@ Segment::Segment(const std::string &serviceId, const std::string &serviceInstanc
 
     static std::random_device dev;
     static std::mt19937 rng(dev());
+    std::uniform_int_distribution<uint32_t> dist(0, UINT32_MAX);
 
-    std::string traceId = Manager::generateUUID() + "." + std::to_string(getpid()) + "." + std::to_string(rng());
+    std::string traceId = Manager::generateUUID() + "." + std::to_string(getpid()) + "." + std::to_string(dist(rng));
     traceId.erase(std::remove(traceId.begin(), traceId.end(), '-'), traceId.end());
 
     Segment::_traceId = traceId;

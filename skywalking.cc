@@ -224,6 +224,12 @@ PHP_MINIT_FUNCTION (skywalking) {
         int visibility = MAP_SHARED | MAP_ANONYMOUS;
 
         s_info = (struct service_info *) mmap(nullptr, sizeof(struct service_info), protection, visibility, -1, 0);
+
+        if (s_info == MAP_FAILED) {
+            php_error(E_ERROR, "[skywalking] Failed to allocate shared memory for service info");
+            return FAILURE;
+        }
+
         // 初始化模块：注册钩子函数、创建消息队列等
         sky_module_init();
 	}

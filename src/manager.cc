@@ -62,8 +62,12 @@ void Manager::setupServiceInfo(const ManagerOptions &options, struct service_inf
         instance = generateUUID();
     }
 
-    strcpy(info->service, options.code.c_str());
-    strcpy(info->service_instance, instance.c_str());
+    // 安全地复制字符串，防止缓冲区溢出
+    strncpy(info->service, options.code.c_str(), sizeof(info->service) - 1);
+    info->service[sizeof(info->service) - 1] = '\0';
+
+    strncpy(info->service_instance, instance.c_str(), sizeof(info->service_instance) - 1);
+    info->service_instance[sizeof(info->service_instance) - 1] = '\0';
 }
 
 // 获取本机的所有 IP 地址（排除 127.x.x.x）
