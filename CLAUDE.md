@@ -98,7 +98,9 @@ extension=skywalking.so
 skywalking.enable = 1
 skywalking.version = 8
 skywalking.app_code = my_application
-skywalking.grpc = 127.0.0.1:11800
+skywalking.log_file_path = /var/log/skywalking
+skywalking.log_file_max_size = 10485760
+skywalking.log_file_max_files = 100
 ```
 
 ## Dependency Check Script

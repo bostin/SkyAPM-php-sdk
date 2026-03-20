@@ -13,6 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
+ *
+ * SkyWalking PHP 扩展 - 管理器模块
+ *
+ * 本模块负责：
+ * 1. 初始化服务信息（服务名、实例名）
+ * 2. 启动后台线程，从消息队列读取追踪数据
+ * 3. 将追踪数据写入本地 JSON 文件
+ * 4. 管理文件轮转（按数量限制）
  */
 
 
@@ -35,14 +43,14 @@
 #define PLATFORM_NAME ""
 #endif
 
+// 管理器配置选项
 struct ManagerOptions {
-    int version;
-    std::string code;
-    std::string log_file_path;
-    int log_file_max_size;
-    int log_file_max_files;
-    std::string authentication;
-    std::string instance_name;
+    int version;              // SkyWalking 协议版本（用于 SW8 header 生成）
+    std::string code;         // 应用代码/名称
+    std::string log_file_path; // 追踪数据文件存储路径
+    int log_file_max_size;    // 单个追踪日志文件的最大大小（字节）
+    int log_file_max_files;   // 保留的最大日志文件数量
+    std::string instance_name; // 实例名称（留空则自动生成 UUID@IP 格式）
 };
 
 class Manager {

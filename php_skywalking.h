@@ -122,37 +122,36 @@ PHP_MINFO_FUNCTION (skywalking);
 
 
 ZEND_BEGIN_MODULE_GLOBALS(skywalking)
-    char *authentication;
-    char *app_code;
-    zend_bool enable;
-    zval context;
-    zval curl_header;
-    int version;
+    char *app_code;                   // 应用代码/名称
+    zend_bool enable;                 // 是否启用扩展
+    zval context;                     // 上下文信息
+    zval curl_header;                 // CURL 请求头信息
+    int version;                      // SkyWalking 协议版本
 
-    void *segment;
-    zend_bool is_swoole;
+    void *segment;                    // 追踪段指针
+    zend_bool is_swoole;              // 是否运行在 Swoole 环境
 
-    // file logging
-    char *log_file_path;
-    zend_long log_file_max_size;
-    zend_long log_file_max_files;
+    // 文件日志配置（追踪数据）
+    char *log_file_path;              // 追踪数据文件存储路径
+    zend_long log_file_max_size;      // 单个文件最大大小（字节）
+    zend_long log_file_max_files;     // 最大文件数量
 
-    // log
-    zend_bool log_enable;
-    char *log_path;
+    // 扩展内部调试日志
+    zend_bool log_enable;             // 是否启用调试日志
+    char *log_path;                   // 调试日志文件路径
 
-    // php error log
-    zend_bool error_handler_enable;
+    // PHP 错误处理
+    zend_bool error_handler_enable;   // 是否启用错误处理器
 
-    // message queue
-    int mq_max_message_length;
+    // 消息队列配置
+    int mq_max_message_length;        // 消息队列最大消息长度（字节）
 
-    // rate limit
-    void *rate_limiter;
-    int sample_n_per_3_secs;
+    // 采样率限制
+    void *rate_limiter;               // 限流器指针
+    int sample_n_per_3_secs;          // 每 3 秒采样数量（-1 表示不限制）
 
-    // fixed UUID
-    char *instance_name;
+    // 实例标识
+    char *instance_name;              // 实例名称（留空则自动生成）
 ZEND_END_MODULE_GLOBALS(skywalking)
 
 extern ZEND_DECLARE_MODULE_GLOBALS(skywalking);

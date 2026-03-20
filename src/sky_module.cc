@@ -102,7 +102,6 @@ void sky_module_init() {
     opt.log_file_path = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
     opt.log_file_max_size = SKYWALKING_G(log_file_max_size);
     opt.log_file_max_files = SKYWALKING_G(log_file_max_files);
-    opt.authentication = SKYWALKING_G(authentication);
     opt.instance_name = SKYWALKING_G(instance_name);
 
     Manager::init(opt, s_info);

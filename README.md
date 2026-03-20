@@ -12,7 +12,7 @@ SkyAPM PHP
 
 <img src="https://skyapmtest.github.io/page-resources/SkyAPM/skyapm.png" alt="Sky Walking logo" height="90px" align="right" />
 
-**SkyAPM PHP** is the PHP instrumentation agent, which is compatible with [Apache SkyWalking](https://github.com/apache/skywalking) backend and others compatible agents/SDKs
+**SkyAPM PHP** is the PHP instrumentation agent, which collects distributed traces and writes them to local JSON files for processing.
 
 ## Architecture
 
@@ -33,11 +33,9 @@ PHP Request → Segment → JSON Serialization → Message Queue → File Logger
 
 ## Support List
 1. CURL
-1. PDO
 1. Mysqli
 1. Yar Client (version > 2.0.4) ([Yar](https://www.php.net/manual/en/book.yar.php))
 1. Yar Server ([Yar](https://www.php.net/manual/en/book.yar.php))
-1. GRPC Client ([GRPC](https://github.com/grpc/grpc-php))
 1. Predis Client ([Predis](https://packagist.org/packages/predis/predis))
 1. Redis Extension ([Redis Extension](https://github.com/phpredis/phpredis))
 1. Memcache Extension ([Memcache Extension](https://www.php.net/manual/en/book.memcached.php))
