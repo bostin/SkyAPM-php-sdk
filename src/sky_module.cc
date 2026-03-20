@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #include <chrono>
 #include <random>
+#include <fcntl.h>
+#include <sys/file.h>
 
 #include "segment.h"
 #include "sky_utils.h"
@@ -94,10 +96,25 @@ void sky_module_init() {
 
     Manager::setupServiceInfo(opt, s_info);
 
-    sky_log("service: " + std::string(s_info->service));
-    sky_log("service_instance: " + std::string(s_info->service_instance));
-    sky_log("log_file_path: " + opt.log_file_path);
-    sky_log("the apache skywalking php plugin mounted (direct file write mode)");
+    // 使用文件锁确保只有一个进程输出初始化日志
+    // 避免多进程环境下的日志洪水
+    if (SKYWALKING_G(log_enable)) {
+        std::string lock_file = opt.log_file_path + "/.skywalking_init_lock";
+        int lock_fd = open(lock_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (lock_fd != -1) {
+            // 尝试获取独占锁（非阻塞）
+            if (flock(lock_fd, LOCK_EX | LOCK_NB) == 0) {
+                // 获取到锁，输出初始化日志
+                sky_log("service: " + std::string(s_info->service));
+                sky_log("service_instance: " + std::string(s_info->service_instance));
+                sky_log("log_file_path: " + opt.log_file_path);
+                sky_log("the apache skywalking php plugin mounted (direct file write mode)");
+                // 释放锁
+                flock(lock_fd, LOCK_UN);
+            }
+            close(lock_fd);
+        }
+    }
 }
 
 void sky_module_cleanup() {
@@ -113,10 +130,15 @@ void sky_module_cleanup() {
 void sky_request_init(zval *request, uint64_t request_id) {
     array_init(&SKYWALKING_G(curl_header));
 
-    sky_log("sky_request_init: starting for request_id=" + std::to_string(request_id));
+    // 只在调试模式下输出详细日志
+    if (SKYWALKING_G(log_enable)) {
+        sky_log("sky_request_init: starting for request_id=" + std::to_string(request_id));
+    }
 
     if (!static_cast<FixedWindowRateLimiter*>(SKYWALKING_G(rate_limiter))->validate()) {
-        sky_log("sky_request_init: rate limited, skipping segment");
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("sky_request_init: rate limited, skipping segment");
+        }
         auto *segment = new Segment(s_info->service, s_info->service_instance, SKYWALKING_G(version), "");
         segment->setSkip(true);
         (void)sky_insert_segment(request_id, segment);
@@ -226,7 +248,9 @@ void sky_request_init(zval *request, uint64_t request_id) {
         span->addTag("http.method", Z_STRVAL_P(request_method));
     }
 
-    sky_log("sky_request_init: segment created successfully");
+    if (SKYWALKING_G(log_enable)) {
+        sky_log("sky_request_init: segment created successfully");
+    }
 }
 
 
@@ -261,7 +285,9 @@ static void write_trace_to_file(const std::string &json_str) {
         outfile << json_str;
         outfile.close();
         if (outfile.good()) {
-            sky_log("write trace to file: " + filename);
+            if (SKYWALKING_G(log_enable)) {
+                sky_log("write trace to file: " + filename);
+            }
         } else {
             sky_log("failed to write trace data to: " + filename);
         }
@@ -273,12 +299,16 @@ static void write_trace_to_file(const std::string &json_str) {
 void sky_request_flush(zval *response, uint64_t request_id) {
     auto *segment = sky_get_segment(nullptr, request_id);
     if (segment == nullptr) {
-        sky_log("sky_request_flush: segment is null, skipping");
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("sky_request_flush: segment is null, skipping");
+        }
         return;
     }
 
     if (segment->skip()) {
-        sky_log("segment skipped, deleting");
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("segment skipped, deleting");
+        }
         delete segment;
         sky_remove_segment(request_id);
 
@@ -290,7 +320,9 @@ void sky_request_flush(zval *response, uint64_t request_id) {
     }
 
     std::string msg = segment->marshal();
-    sky_log("segment marshaled, size=" + std::to_string(msg.size()));
+    if (SKYWALKING_G(log_enable)) {
+        sky_log("segment marshaled, size=" + std::to_string(msg.size()));
+    }
 
     delete segment;
     sky_remove_segment(request_id);
