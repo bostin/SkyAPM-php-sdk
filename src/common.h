@@ -19,6 +19,8 @@
 #ifndef SKYWALKING_COMMON_H
 #define SKYWALKING_COMMON_H
 
+#include <signal.h>
+
 #ifdef __cplusplus
 #define SKY_BEGIN_EXTERN_C() extern "C" {
 #define SKY_END_EXTERN_C() }
