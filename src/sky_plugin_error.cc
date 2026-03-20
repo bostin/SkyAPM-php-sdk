@@ -20,6 +20,7 @@
 #include "php_skywalking.h"
 #include "segment.h"
 #include <string>
+#include <unordered_map>
 
 #if PHP_VERSION_ID < 80000
 extern void (*orig_error_cb)(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args);
@@ -77,7 +78,7 @@ void sky_plugin_error_cb(int type, const char *error_filename, const uint32_t er
 #endif
 
     if (!SKYWALKING_G(is_swoole) && SKYWALKING_G(enable) && SKYWALKING_G(segment) != nullptr) {
-        auto *segments = static_cast<std::map<uint64_t, Segment *> *>SKYWALKING_G(segment);
+        auto *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>SKYWALKING_G(segment);
         auto segment = segments->at(0);
         auto span = segment->firstSpan();
         span->addLog(level, log);
