@@ -55,9 +55,6 @@ static StorageInterface* g_storage = nullptr;
 // 创建存储后端实例（仅支持 JSON 文件存储）
 static StorageInterface* create_storage_backend() {
     std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
-    if (SKYWALKING_G(log_enable)) {
-        sky_log("Creating JSON file storage backend: " + logPath);
-    }
     auto* storage = new JsonStorage(logPath);
     storage->initialize();
     return storage;
@@ -122,23 +119,40 @@ void sky_module_init(struct service_info *info) {
         // 确保日志目录存在
         mkdir(opt.log_file_path.c_str(), 0755);
 
-        // 原子操作：只允许一个进程创建标记文件
-        int marker_fd = open(marker_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+        // 检查标记文件是否存在且太旧（超过60秒）
+        struct stat st;
+        bool should_create_log = true;
+        if (stat(marker_file.c_str(), &st) == 0) {
+            // 文件存在，检查时间
+            auto now = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            auto file_age = now - st.st_mtime;
+            if (file_age < 60) {
+                // 文件较新，跳过日志输出
+                should_create_log = false;
+            } else {
+                // 文件太旧，删除它
+                unlink(marker_file.c_str());
+            }
+        }
 
-        if (marker_fd == -1) {
-            // 文件已存在 - 其他进程已初始化，静默跳过
-            // 不需要输出任何日志
-        } else {
-            // 我们是第一个进程 - 输出初始化日志
-            sky_log("service: " + std::string(info->service));
-            sky_log("service_instance: " + std::string(info->service_instance));
-            sky_log("log_file_path: " + opt.log_file_path);
-            sky_log("the apache skywalking php plugin mounted (direct file write mode)");
+        if (should_create_log) {
+            // 原子操作：只允许一个进程创建标记文件
+            int marker_fd = open(marker_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
 
-            // 写入 PID（用于调试，可选）
-            std::string pid_str = std::to_string(getpid()) + "\n";
-            write(marker_fd, pid_str.c_str(), pid_str.length());
-            close(marker_fd);
+            if (marker_fd != -1) {
+                // 我们是第一个进程 - 输出初始化日志
+                sky_log("service: " + std::string(info->service));
+                sky_log("service_instance: " + std::string(info->service_instance));
+                sky_log("log_file_path: " + opt.log_file_path);
+                sky_log("storage: JSON file backend");
+                sky_log("the apache skywalking php plugin mounted");
+
+                // 写入 PID（用于调试，可选）
+                std::string pid_str = std::to_string(getpid()) + "\n";
+                write(marker_fd, pid_str.c_str(), pid_str.length());
+                close(marker_fd);
+            }
         }
     }
 }
@@ -152,11 +166,8 @@ void sky_module_cleanup() {
     delete segments;
     delete static_cast<FixedWindowRateLimiter*>(SKYWALKING_G(rate_limiter));
 
-    // 清理存储后端
+    // 清理存储后端（无日志）
     if (g_storage) {
-        if (SKYWALKING_G(log_enable)) {
-            sky_log("Shutting down storage backend");
-        }
         g_storage->shutdown();
         delete g_storage;
         g_storage = nullptr;
