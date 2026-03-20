@@ -38,6 +38,7 @@
 #include "src/sky_utils.h"
 #include "src/sky_module.h"
 #include "src/segment.h"
+#include "src/sky_log.h"
 #include "sys/mman.h"
 
 #ifdef MYSQLI_USE_MYSQLND
