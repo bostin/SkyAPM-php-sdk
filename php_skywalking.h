@@ -37,9 +37,15 @@
 
 #include "thread"
 
+#include <algorithm>
 #include "src/common.h"
 
 SKY_BEGIN_EXTERN_C()
+
+#include <math.h>
+#include <cmath>
+#define isnan   std::isnan
+#define isfinite std::isfinite
 
 #include "php.h"
 #include "php_ini.h"

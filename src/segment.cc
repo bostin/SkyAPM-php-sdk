@@ -74,7 +74,7 @@ std::string Segment::marshal() {
     json.addKeyValue("traceSegmentId", _traceSegmentId);
     json.addKeyValue("service", _serviceId);
     json.addKeyValue("serviceInstance", _serviceInstanceId);
-    json.addKeyValue("isSizeLimited", _isSizeLimited);
+    //json.addKeyValue("isSizeLimited", _isSizeLimited);
 
     // Spans 数组
     json.startArray("spans");
