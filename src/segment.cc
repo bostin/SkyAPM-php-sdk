@@ -16,7 +16,7 @@
  */
 
 
-
+#include <algorithm>
 #include <random>
 #include <unistd.h>
 #include "segment.h"
