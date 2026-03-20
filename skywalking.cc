@@ -47,7 +47,9 @@
 
 ZEND_DECLARE_MODULE_GLOBALS(skywalking)
 
-struct service_info *s_info = nullptr;
+// 使用进程局部静态变量替代共享内存
+// 每个 worker 进程独立维护服务信息，确保确定性实例名生成
+static struct service_info local_service_info = {0};
 
 PHP_INI_BEGIN()
     // 启用/禁用 SkyWalking 扩展
@@ -103,6 +105,19 @@ PHP_INI_BEGIN()
     // 用于标识服务实例，便于在分布式环境中识别
     STD_PHP_INI_ENTRY("skywalking.instance_name", "", PHP_INI_ALL, OnUpdateString, instance_name, zend_skywalking_globals, skywalking_globals)
 
+    // 存储后端：sqlite | json
+    // sqlite: 使用 SQLite 数据库存储（支持查询和聚合）
+    // json: 使用 JSON 文件存储（向后兼容）
+    STD_PHP_INI_ENTRY("skywalking.storage_backend", "json", PHP_INI_ALL, OnUpdateString, storage_backend, zend_skywalking_globals, skywalking_globals)
+
+    // SQLite 数据库文件路径
+    // 当 storage_backend=sqlite 时使用
+    STD_PHP_INI_ENTRY("skywalking.db_path", "/tmp/skywalking/traces.db", PHP_INI_ALL, OnUpdateString, db_path, zend_skywalking_globals, skywalking_globals)
+
+    // 数据保留天数（0 = 永久保留）
+    // 超过此天数的数据将被自动清理
+    STD_PHP_INI_ENTRY("skywalking.retention_days", "7", PHP_INI_ALL, OnUpdateLong, retention_days, zend_skywalking_globals, skywalking_globals)
+
 PHP_INI_END()
 
 // 初始化全局变量默认值
@@ -131,6 +146,11 @@ static void php_skywalking_init_globals(zend_skywalking_globals *skywalking_glob
 
     // uuid path
     skywalking_globals->instance_name = nullptr;
+
+    // storage backend
+    skywalking_globals->storage_backend = nullptr;
+    skywalking_globals->db_path = nullptr;
+    skywalking_globals->retention_days = 7;
 
 }
 
@@ -219,19 +239,8 @@ PHP_MINIT_FUNCTION (skywalking) {
 	REGISTER_INI_ENTRIES();
 
 	if (SKYWALKING_G(enable)) {
-        // 创建共享内存用于存储服务信息
-        int protection = PROT_READ | PROT_WRITE;
-        int visibility = MAP_SHARED | MAP_ANONYMOUS;
-
-        s_info = (struct service_info *) mmap(nullptr, sizeof(struct service_info), protection, visibility, -1, 0);
-
-        if (s_info == MAP_FAILED) {
-            php_error(E_ERROR, "[skywalking] Failed to allocate shared memory for service info");
-            return FAILURE;
-        }
-
-        // 初始化模块：注册钩子函数、创建消息队列等
-        sky_module_init();
+        // 初始化模块：注册钩子函数、使用确定性实例名生成
+        sky_module_init(&local_service_info);
 	}
 
 	return SUCCESS;
@@ -242,7 +251,7 @@ PHP_MSHUTDOWN_FUNCTION (skywalking) {
     UNREGISTER_INI_ENTRIES();
 
     if (SKYWALKING_G(enable)) {
-        // 清理模块资源：删除消息队列、释放内存等
+        // 清理模块资源
         sky_module_cleanup();
     }
 
@@ -258,13 +267,15 @@ PHP_RINIT_FUNCTION(skywalking)
     if (SKYWALKING_G(enable)) {
         // 只在 PHP-FPM 环境下自动初始化追踪
         if (strcasecmp("fpm-fcgi", sapi_module.name) == 0) {
-            if (strlen(s_info->service_instance) == 0) {
-                sky_log("service_instance is empty, skip tracing");
+            if (strlen(local_service_info.service_instance) == 0) {
+                if (SKYWALKING_G(log_enable)) {
+                    sky_log("service_instance is empty, skip tracing");
+                }
                 return SUCCESS;
             }
 
             // 初始化请求追踪：创建追踪段、解析 SW8 header 等
-            sky_request_init(nullptr, 0);
+            sky_request_init(nullptr, 0, &local_service_info);
         }
     }
     return SUCCESS;

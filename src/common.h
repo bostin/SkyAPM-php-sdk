@@ -28,6 +28,7 @@
 #endif
 
 struct service_info {
+    volatile sig_atomic_t initialized;  // 0=未初始化，1=已初始化（原子操作，防止竞态条件）
     char service[0x400];
     char service_instance[0x400];
 };

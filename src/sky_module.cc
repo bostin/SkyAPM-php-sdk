@@ -34,8 +34,9 @@
 #include "sky_plugin_error.h"
 #include "sky_log.h"
 #include "sky_rate_limit.h"
-
-extern struct service_info *s_info;
+#include "storage/storage_interface.h"
+#include "storage/sqlite_storage.h"
+#include "storage/json_storage.h"
 
 extern void (*ori_execute_ex)(zend_execute_data *execute_data);
 
@@ -49,7 +50,51 @@ extern void (*orig_curl_setopt_array)(INTERNAL_FUNCTION_PARAMETERS);
 
 extern void (*orig_curl_close)(INTERNAL_FUNCTION_PARAMETERS);
 
-void sky_module_init() {
+// 全局存储接口指针
+static StorageInterface* g_storage = nullptr;
+
+// 创建存储后端实例
+static StorageInterface* create_storage_backend() {
+    std::string backend = SKYWALKING_G(storage_backend) ? SKYWALKING_G(storage_backend) : "json";
+
+#ifdef HAVE_SQLITE3
+    if (backend == "sqlite") {
+        std::string dbPath = SKYWALKING_G(db_path) ? SKYWALKING_G(db_path) : "/tmp/skywalking/traces.db";
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("Creating SQLite storage backend: " + dbPath);
+        }
+        auto* storage = new SQLiteStorage(dbPath);
+        if (!storage->initialize()) {
+            if (SKYWALKING_G(log_enable)) {
+                sky_log("Failed to initialize SQLite storage, falling back to JSON storage");
+            }
+            delete storage;
+            // 降级到 JSON 存储
+            std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
+            return new JsonStorage(logPath);
+        }
+        return storage;
+    }
+#else
+    // 没有SQLite支持时，如果用户配置了sqlite，发出警告并降级到JSON
+    if (backend == "sqlite") {
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("SQLite support not compiled in, falling back to JSON storage");
+        }
+    }
+#endif
+
+    // 默认使用 JSON 存储
+    std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
+    if (SKYWALKING_G(log_enable)) {
+        sky_log("Creating JSON storage backend: " + logPath);
+    }
+    auto* storage = new JsonStorage(logPath);
+    storage->initialize();
+    return storage;
+}
+
+void sky_module_init(struct service_info *info) {
     ori_execute_ex = zend_execute_ex;
     zend_execute_ex = sky_execute_ex;
 
@@ -85,7 +130,7 @@ void sky_module_init() {
     FixedWindowRateLimiter *rate_limiter = new FixedWindowRateLimiter(SKYWALKING_G(sample_n_per_3_secs));
     SKYWALKING_G(rate_limiter) = rate_limiter;
 
-    // 初始化服务信息（不再使用消息队列和后台线程）
+    // 初始化服务信息（使用确定性实例名生成）
     ManagerOptions opt;
     opt.version = SKYWALKING_G(version);
     opt.code = SKYWALKING_G(app_code);
@@ -94,25 +139,47 @@ void sky_module_init() {
     opt.log_file_max_files = SKYWALKING_G(log_file_max_files);
     opt.instance_name = SKYWALKING_G(instance_name);
 
-    Manager::setupServiceInfo(opt, s_info);
+    Manager::setupServiceInfo(opt, info);
 
-    // 使用文件锁确保只有一个进程输出初始化日志
+    // 初始化存储后端
+    g_storage = create_storage_backend();
+
+    // 使用原子文件创建替代文件锁机制
+    // O_CREAT | O_EXCL 是内核级原子操作，确保只有一个进程输出初始化日志
     // 避免多进程环境下的日志洪水
     if (SKYWALKING_G(log_enable)) {
-        std::string lock_file = opt.log_file_path + "/.skywalking_init_lock";
-        int lock_fd = open(lock_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        if (lock_fd != -1) {
-            // 尝试获取独占锁（非阻塞）
-            if (flock(lock_fd, LOCK_EX | LOCK_NB) == 0) {
-                // 获取到锁，输出初始化日志
-                sky_log("service: " + std::string(s_info->service));
-                sky_log("service_instance: " + std::string(s_info->service_instance));
-                sky_log("log_file_path: " + opt.log_file_path);
-                sky_log("the apache skywalking php plugin mounted (direct file write mode)");
-                // 释放锁
-                flock(lock_fd, LOCK_UN);
+        std::string marker_file = opt.log_file_path + "/.skywalking_init_marker";
+
+        // 确保日志目录存在
+        mkdir(opt.log_file_path.c_str(), 0755);
+
+        // 原子操作：只允许一个进程创建标记文件
+        int marker_fd = open(marker_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+
+        if (marker_fd == -1) {
+            // 文件已存在 - 其他进程已初始化，静默跳过
+            // 不需要输出任何日志
+        } else {
+            // 我们是第一个进程 - 输出初始化日志
+            sky_log("service: " + std::string(info->service));
+            sky_log("service_instance: " + std::string(info->service_instance));
+            sky_log("log_file_path: " + opt.log_file_path);
+
+            // 输出存储后端信息
+            std::string backend = SKYWALKING_G(storage_backend) ? SKYWALKING_G(storage_backend) : "json";
+            sky_log("storage_backend: " + backend);
+
+            if (backend == "sqlite") {
+                std::string dbPath = SKYWALKING_G(db_path) ? SKYWALKING_G(db_path) : "/tmp/skywalking/traces.db";
+                sky_log("sqlite_db_path: " + dbPath);
             }
-            close(lock_fd);
+
+            sky_log("the apache skywalking php plugin mounted (direct file write mode)");
+
+            // 写入 PID（用于调试，可选）
+            std::string pid_str = std::to_string(getpid()) + "\n";
+            write(marker_fd, pid_str.c_str(), pid_str.length());
+            close(marker_fd);
         }
     }
 }
@@ -125,9 +192,19 @@ void sky_module_cleanup() {
 
     delete segments;
     delete static_cast<FixedWindowRateLimiter*>(SKYWALKING_G(rate_limiter));
+
+    // 清理存储后端
+    if (g_storage) {
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("Shutting down storage backend");
+        }
+        g_storage->shutdown();
+        delete g_storage;
+        g_storage = nullptr;
+    }
 }
 
-void sky_request_init(zval *request, uint64_t request_id) {
+void sky_request_init(zval *request, uint64_t request_id, struct service_info *info) {
     array_init(&SKYWALKING_G(curl_header));
 
     // 只在调试模式下输出详细日志
@@ -139,7 +216,7 @@ void sky_request_init(zval *request, uint64_t request_id) {
         if (SKYWALKING_G(log_enable)) {
             sky_log("sky_request_init: rate limited, skipping segment");
         }
-        auto *segment = new Segment(s_info->service, s_info->service_instance, SKYWALKING_G(version), "");
+        auto *segment = new Segment(info->service, info->service_instance, SKYWALKING_G(version), "");
         segment->setSkip(true);
         (void)sky_insert_segment(request_id, segment);
 
@@ -215,7 +292,7 @@ void sky_request_init(zval *request, uint64_t request_id) {
 
     std::unordered_map<uint64_t, Segment *> *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>SKYWALKING_G(segment);
 
-    auto *segment = new Segment(s_info->service, s_info->service_instance, SKYWALKING_G(version), header);
+    auto *segment = new Segment(info->service, info->service_instance, SKYWALKING_G(version), header);
 
     // 插入 segment 并检查是否成功
     if (!sky_insert_segment(request_id, segment)) {
@@ -289,10 +366,14 @@ static void write_trace_to_file(const std::string &json_str) {
                 sky_log("write trace to file: " + filename);
             }
         } else {
-            sky_log("failed to write trace data to: " + filename);
+            if (SKYWALKING_G(log_enable)) {
+                sky_log("failed to write trace data to: " + filename);
+            }
         }
     } else {
-        sky_log("failed to open trace file: " + filename);
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("failed to open trace file: " + filename);
+        }
     }
 }
 
@@ -319,14 +400,19 @@ void sky_request_flush(zval *response, uint64_t request_id) {
         segment->setStatusCode(SG(sapi_headers).http_response_code);
     }
 
-    std::string msg = segment->marshal();
+    // 使用存储后端保存追踪数据
+    if (g_storage) {
+        g_storage->saveSegment(segment);
+    } else {
+        // 如果存储后端未初始化，回退到直接写入文件
+        std::string msg = segment->marshal();
+        write_trace_to_file(msg);
+    }
+
     if (SKYWALKING_G(log_enable)) {
-        sky_log("segment marshaled, size=" + std::to_string(msg.size()));
+        sky_log("segment flushed");
     }
 
     delete segment;
     sky_remove_segment(request_id);
-
-    // 直接写入文件（不再使用消息队列）
-    write_trace_to_file(msg);
 }

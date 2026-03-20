@@ -48,6 +48,14 @@ public:
 
     const std::string& getTraceId();
 
+    const std::string& getServiceId() const { return _serviceId; }
+
+    const std::string& getServiceInstanceId() const { return _serviceInstanceId; }
+
+    const std::vector<Span*>& getSpans() const { return spans; }
+
+    int getVersion() const { return _version; }
+
     void setSkip(bool skip);
 
     bool skip();

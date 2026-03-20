@@ -35,12 +35,12 @@
 
 #include "php_skywalking.h"
 #include "sky_log.h"
-
-extern struct service_info *s_info;
+#include <unistd.h>
 
 static std::string fixed_uuid;
 
 // 设置服务信息（服务名、实例名）
+// 使用确定性实例名生成，确保所有进程生成相同的实例名
 // @param options 配置选项
 // @param info 服务信息结构体指针
 void Manager::setupServiceInfo(const ManagerOptions &options, struct service_info *info) {
@@ -48,18 +48,21 @@ void Manager::setupServiceInfo(const ManagerOptions &options, struct service_inf
         return;
     }
 
-    auto ips = getIps();
     std::string instance;
 
     if (!options.instance_name.empty()) {
-        // 使用用户指定的实例名
+        // 使用用户指定的实例名（确定性）
         instance = options.instance_name;
-    } else if (!ips.empty()) {
-        // 自动生成实例名：UUID@IP
-        instance = generateUUID() + "@" + ips[0];
     } else {
-        // 如果没有找到 IP 地址，只使用 UUID
-        instance = generateUUID();
+        // 生成确定性实例名：主机名 + 固定标识
+        // 所有相同配置的进程会生成相同的实例名
+        char hostname[HOST_NAME_MAX + 1];
+        if (gethostname(hostname, sizeof(hostname)) == 0) {
+            instance = std::string(hostname) + "-skywalking-agent";
+        } else {
+            // 回退到 "localhost-skywalking-agent"
+            instance = "localhost-skywalking-agent";
+        }
     }
 
     // 安全地复制字符串，防止缓冲区溢出
@@ -68,6 +71,9 @@ void Manager::setupServiceInfo(const ManagerOptions &options, struct service_inf
 
     strncpy(info->service_instance, instance.c_str(), sizeof(info->service_instance) - 1);
     info->service_instance[sizeof(info->service_instance) - 1] = '\0';
+
+    // 标记为已初始化
+    info->initialized = 1;
 }
 
 // 获取本机的所有 IP 地址（排除 127.x.x.x）

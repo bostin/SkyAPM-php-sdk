@@ -37,6 +37,20 @@ else
   AC_MSG_RESULT([found in $json_inc_path])
 fi
 
+# SQLite 3 library (OPTIONAL - for SQLite storage backend)
+# If SQLite is not available, the extension will fall back to JSON file storage
+AC_MSG_CHECKING([for sqlite3 library (optional)])
+PHP_CHECK_LIBRARY(sqlite3, sqlite3_open,
+  [
+    PHP_ADD_LIBRARY_WITH_PATH(sqlite3, $SQLITE3_DIR/lib, SKYWALKING_SHARED_LIBADD)
+    AC_DEFINE(HAVE_SQLITE3, 1, [Whether you have SQLite3])
+    AC_MSG_RESULT([found - SQLite storage backend enabled])
+  ],[
+    AC_MSG_RESULT([not found - SQLite storage backend disabled, will use JSON file storage])
+  ],[
+    -L$SQLITE3_DIR/lib
+  ]
+)
 
 if test "$PHP_SKYWALKING" != "no"; then
 
@@ -90,6 +104,8 @@ if test "$PHP_SKYWALKING" != "no"; then
       src/span.cc \
       src/tag.cc \
       src/json_builder.cc \
+      src/storage/sqlite_storage.cc \
+      src/storage/json_storage.cc \
   , $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1, cxx)
 fi
 
