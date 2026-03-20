@@ -19,8 +19,10 @@
 #include <unordered_map>
 #include <iostream>
 #include "sky_module.h"
-#include <boost/interprocess/ipc/message_queue.hpp>
 #include <fstream>
+#include <sys/stat.h>
+#include <chrono>
+#include <random>
 
 #include "segment.h"
 #include "sky_utils.h"
@@ -55,7 +57,7 @@ void sky_module_init() {
     if (SKYWALKING_G(error_handler_enable)) {
         sky_plugin_error_init();
     }
-    
+
     // bind curl
     zend_function *old_function;
     if ((old_function = SKY_OLD_FN("curl_exec")) != nullptr) {
@@ -81,21 +83,7 @@ void sky_module_init() {
     FixedWindowRateLimiter *rate_limiter = new FixedWindowRateLimiter(SKYWALKING_G(sample_n_per_3_secs));
     SKYWALKING_G(rate_limiter) = rate_limiter;
 
-    sprintf(s_info->mq_name, "skywalking_queue_%d", getpid());
-
-    try {
-        boost::interprocess::message_queue::remove(s_info->mq_name);
-        boost::interprocess::message_queue(
-                boost::interprocess::open_or_create,
-                s_info->mq_name,
-                1024,
-                SKYWALKING_G(mq_max_message_length),
-                boost::interprocess::permissions(0666)
-        );
-    } catch (boost::interprocess::interprocess_exception &ex) {
-        php_error(E_WARNING, "%s %s", "[skywalking] create queue fail ", ex.what());
-    }
-
+    // 初始化服务信息（不再使用消息队列和后台线程）
     ManagerOptions opt;
     opt.version = SKYWALKING_G(version);
     opt.code = SKYWALKING_G(app_code);
@@ -104,16 +92,15 @@ void sky_module_init() {
     opt.log_file_max_files = SKYWALKING_G(log_file_max_files);
     opt.instance_name = SKYWALKING_G(instance_name);
 
-    Manager::init(opt, s_info);
+    Manager::setupServiceInfo(opt, s_info);
+
+    sky_log("service: " + std::string(s_info->service));
+    sky_log("service_instance: " + std::string(s_info->service_instance));
+    sky_log("log_file_path: " + opt.log_file_path);
+    sky_log("the apache skywalking php plugin mounted (direct file write mode)");
 }
 
 void sky_module_cleanup() {
-    char mq_name[32];
-    sprintf(mq_name, "skywalking_queue_%d", getpid());
-    if (strcmp(s_info->mq_name, mq_name) == 0) {
-        boost::interprocess::message_queue::remove(s_info->mq_name);
-    }
-
     std::unordered_map<uint64_t, Segment *> *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>(SKYWALKING_G(segment));
     for (auto entry : *segments) {
         delete entry.second;
@@ -215,6 +202,41 @@ void sky_request_init(zval *request, uint64_t request_id) {
 }
 
 
+// 辅助函数：直接写入追踪数据到文件
+static void write_trace_to_file(const std::string &json_str) {
+    std::string log_file_path = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
+
+    // 确保日志目录存在
+    mkdir(log_file_path.c_str(), 0755);
+
+    // 从 JSON 中提取 traceId（简单解析）
+    size_t traceIdPos = json_str.find("\"traceId\":\"");
+    std::string traceIdShort = "unknown";
+    if (traceIdPos != std::string::npos) {
+        size_t start = traceIdPos + 11; // 跳过 "traceId":"
+        size_t end = json_str.find("\"", start);
+        if (end != std::string::npos) {
+            traceIdShort = json_str.substr(start, std::min(end - start, size_t(8)));
+        }
+    }
+
+    // 生成文件名: skywalking-{timestamp}-{traceid}-{pid}.json
+    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string filename = log_file_path + "/skywalking-" +
+        std::to_string(now) + "-" + traceIdShort + "-" + std::to_string(getpid()) + ".json";
+
+    // 写入文件
+    std::ofstream outfile(filename);
+    if (outfile.is_open()) {
+        outfile << json_str;
+        outfile.close();
+        sky_log("write trace to file: " + filename);
+    } else {
+        sky_log("failed to write trace file: " + filename);
+    }
+}
+
 void sky_request_flush(zval *response, uint64_t request_id) {
     auto *segment = sky_get_segment(nullptr, request_id);
     if (segment->skip()) {
@@ -235,25 +257,6 @@ void sky_request_flush(zval *response, uint64_t request_id) {
     delete segment;
     sky_remove_segment(request_id);
 
-    int msg_length = static_cast<int>(msg.size());
-    int max_length = SKYWALKING_G(mq_max_message_length);
-    if (msg_length > max_length) {
-        sky_log("message is too big: " + std::to_string(msg_length) + ", mq_max_message_length=" + std::to_string(max_length));
-        return;
-    }
-
-    try {
-        boost::interprocess::message_queue mq(
-                boost::interprocess::open_only,
-                s_info->mq_name
-        );
-        if (!mq.try_send(msg.data(), msg.size(), 0)) {
-            sky_log("sky_request_flush: message queue is full");
-        } else {
-            sky_log("sky_request_flush: message sent to queue successfully");
-        }
-    } catch (boost::interprocess::interprocess_exception &ex) {
-        sky_log("sky_request_flush: message queue error - " + std::string(ex.what()));
-        php_error(E_WARNING, "%s %s", "[skywalking] open queue fail ", ex.what());
-    }
+    // 直接写入文件（不再使用消息队列）
+    write_trace_to_file(msg);
 }

@@ -19,8 +19,6 @@
 #ifndef SKYWALKING_COMMON_H
 #define SKYWALKING_COMMON_H
 
-#include <boost/interprocess/ipc/message_queue.hpp>
-
 #ifdef __cplusplus
 #define SKY_BEGIN_EXTERN_C() extern "C" {
 #define SKY_END_EXTERN_C() }
@@ -32,9 +30,6 @@
 struct service_info {
     char service[0x400];
     char service_instance[0x400];
-    char mq_name[32];
-
-    boost::interprocess::message_queue *mq;
 };
 
 #endif //SKYWALKING_COMMON_H

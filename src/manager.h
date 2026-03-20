@@ -18,9 +18,7 @@
  *
  * 本模块负责：
  * 1. 初始化服务信息（服务名、实例名）
- * 2. 启动后台线程，从消息队列读取追踪数据
- * 3. 将追踪数据写入本地 JSON 文件
- * 4. 管理文件轮转（按数量限制）
+ * 2. 生成 UUID
  */
 
 
@@ -58,16 +56,10 @@ class Manager {
 public:
     static std::string generateUUID();
 
-    static void init(const ManagerOptions &options, struct service_info *info);
+    static void setupServiceInfo(const ManagerOptions &options, struct service_info *info);
 
 private:
     Manager() = delete;
-
-    static void setupServiceInfo(const ManagerOptions &options, struct service_info *info);
-
-    [[noreturn]] static void consumer(const ManagerOptions &options);
-
-    static void logger(const std::string &log);
 
     static std::vector<std::string> getIps();
 };
