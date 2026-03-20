@@ -32,4 +32,7 @@ void sky_request_init(zval *request, uint64_t request_id, struct service_info *i
 
 void sky_request_flush(zval *response, uint64_t request_id);
 
+// 获取服务信息结构体指针
+struct service_info* get_service_info();
+
 #endif //SKYWALKING_SKY_MODULE_H

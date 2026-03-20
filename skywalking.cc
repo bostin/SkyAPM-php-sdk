@@ -49,7 +49,12 @@ ZEND_DECLARE_MODULE_GLOBALS(skywalking)
 
 // 使用进程局部静态变量替代共享内存
 // 每个 worker 进程独立维护服务信息，确保确定性实例名生成
+// 导出此变量以供其他模块访问
 static struct service_info local_service_info = {0};
+
+struct service_info* get_service_info() {
+    return &local_service_info;
+}
 
 PHP_INI_BEGIN()
     // 启用/禁用 SkyWalking 扩展

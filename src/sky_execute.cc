@@ -62,7 +62,7 @@ void sky_execute_ex(zend_execute_data *execute_data) {
                         zval *z_fd = sky_read_property(sw_request, "fd", 0);
                         SKYWALKING_G(is_swoole) = true;
                         request_id = Z_LVAL_P(z_fd);
-                        sky_request_init(sw_request, request_id);
+                        sky_request_init(sw_request, request_id, get_service_info());
                     }
                 }
             }
