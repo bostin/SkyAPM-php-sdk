@@ -126,7 +126,10 @@ void sky_module_cleanup() {
 void sky_request_init(zval *request, uint64_t request_id) {
     array_init(&SKYWALKING_G(curl_header));
 
+    sky_log("sky_request_init: starting for request_id=" + std::to_string(request_id));
+
     if (!static_cast<FixedWindowRateLimiter*>(SKYWALKING_G(rate_limiter))->validate()) {
+        sky_log("sky_request_init: rate limited, skipping segment");
         auto *segment = new Segment(s_info->service, s_info->service_instance, SKYWALKING_G(version), "");
         segment->setSkip(true);
         (void)sky_insert_segment(request_id, segment);
@@ -207,15 +210,18 @@ void sky_request_init(zval *request, uint64_t request_id) {
     if (request_method != NULL) {
         span->addTag("http.method", Z_STRVAL_P(request_method));
     }
+
+    sky_log("sky_request_init: segment created successfully");
 }
 
 
 void sky_request_flush(zval *response, uint64_t request_id) {
     auto *segment = sky_get_segment(nullptr, request_id);
     if (segment->skip()) {
+        sky_log("segment skipped, deleting");
         delete segment;
         sky_remove_segment(request_id);
-        
+
         return;
     }
 
@@ -224,6 +230,8 @@ void sky_request_flush(zval *response, uint64_t request_id) {
     }
 
     std::string msg = segment->marshal();
+    sky_log("segment marshaled, size=" + std::to_string(msg.size()));
+
     delete segment;
     sky_remove_segment(request_id);
 
@@ -240,10 +248,12 @@ void sky_request_flush(zval *response, uint64_t request_id) {
                 s_info->mq_name
         );
         if (!mq.try_send(msg.data(), msg.size(), 0)) {
-            sky_log("sky_request_flush message_queue is fulled");
+            sky_log("sky_request_flush: message queue is full");
+        } else {
+            sky_log("sky_request_flush: message sent to queue successfully");
         }
     } catch (boost::interprocess::interprocess_exception &ex) {
-        sky_log("sky_request_flush message_queue ex" + std::string(ex.what()));
+        sky_log("sky_request_flush: message queue error - " + std::string(ex.what()));
         php_error(E_WARNING, "%s %s", "[skywalking] open queue fail ", ex.what());
     }
 }

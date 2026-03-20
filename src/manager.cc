@@ -60,14 +60,16 @@ void Manager::setupServiceInfo(const ManagerOptions &options, struct service_inf
 
     auto ips = getIps();
     std::string instance;
-    if (!ips.empty()) {
-        if (!options.instance_name.empty()) {
-            // 使用用户指定的实例名
-            instance = options.instance_name;
-        } else {
-            // 自动生成实例名：UUID@IP
-            instance = generateUUID() + "@" + ips[0];
-        }
+
+    if (!options.instance_name.empty()) {
+        // 使用用户指定的实例名
+        instance = options.instance_name;
+    } else if (!ips.empty()) {
+        // 自动生成实例名：UUID@IP
+        instance = generateUUID() + "@" + ips[0];
+    } else {
+        // 如果没有找到 IP 地址，只使用 UUID
+        instance = generateUUID();
     }
 
     strcpy(info->service, options.code.c_str());
@@ -85,6 +87,10 @@ void Manager::init(const ManagerOptions &options, struct service_info *info) {
     // 直接设置服务信息，无需 gRPC 登录（文件日志模式）
     setupServiceInfo(options, info);
 
+    sky_log("service: " + std::string(info->service));
+    sky_log("service_instance: " + std::string(info->service_instance));
+    sky_log("log_file_path: " + options.log_file_path);
+
     // 启动后台文件写入线程
     std::thread c(consumer, options);
     c.detach();
@@ -101,9 +107,13 @@ void Manager::init(const ManagerOptions &options, struct service_info *info) {
 
     std::vector<std::string> file_list;
 
+    sky_log("consumer thread started, waiting for messages...");
+
     try {
         // 打开消息队列（只读模式）
         boost::interprocess::message_queue mq(boost::interprocess::open_only, s_info->mq_name);
+
+        sky_log("consumer: message queue opened successfully: " + std::string(s_info->mq_name));
 
         while (true) {
             std::string data;
@@ -113,6 +123,8 @@ void Manager::init(const ManagerOptions &options, struct service_info *info) {
             // 从消息队列接收数据（阻塞等待）
             mq.receive(&data[0], data.size(), msg_size, msg_priority);
             data.resize(msg_size);
+
+            sky_log("consumer: received message, size=" + std::to_string(msg_size));
 
             // data 已经是 JSON 格式，直接使用
             std::string json_str = data;
@@ -152,8 +164,8 @@ void Manager::init(const ManagerOptions &options, struct service_info *info) {
             }
         }
     } catch (boost::interprocess::interprocess_exception &ex) {
-        sky_log(ex.what());
-        php_error(E_WARNING, "%s %s", "[skywalking] consumer error ", ex.what());
+        sky_log("consumer error: " + std::string(ex.what()));
+        php_error(E_WARNING, "%s %s: %s", "[skywalking] consumer thread error", s_info->mq_name, ex.what());
     }
 }
 
