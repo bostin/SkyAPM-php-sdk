@@ -34,7 +34,6 @@
 |--------|------|---------|
 | json | JSON 序列化 | `php -m \| grep json` |
 | curl | HTTP 请求拦截 | `php -m \| grep curl` |
-| pdo | 数据库抽象层 | `php -m \| grep pdo` |
 
 ### PHP 内部头文件
 
@@ -42,7 +41,6 @@
 |--------|------|
 | php_json.h | JSON API |
 | php_curl.h | CURL 拦截 |
-| php_pdo_driver.h | PDO 拦截 |
 | mysqli_mysqlnd.h | MySQLi 支持 |
 
 ## 可选依赖（插件支持）
@@ -52,7 +50,6 @@
 | 扩展名 | 用途 | 对应插件 |
 |--------|------|---------|
 | mysqli | MySQL 数据库追踪 | sky_plugin_mysqli.cc |
-| pdo_mysql | MySQL PDO 追踪 | sky_pdo.cc |
 
 ### 缓存插件
 
@@ -65,7 +62,6 @@
 
 | 扩展名 | 用途 | 对应插件 |
 |--------|------|---------|
-| grpc | gRPC 客户端追踪 | sky_plugin_grpc.cc |
 | yar | Yar RPC 追踪 | sky_plugin_yar.cc |
 | amqp | RabbitMQ 追踪 | sky_plugin_rabbit_mq.cc |
 
@@ -102,7 +98,7 @@ sudo apt-get install libboost-all-dev
 sudo apt-get install php-dev php-pear
 
 # 可选：PHP 扩展开发文件
-sudo apt-get install php-curl php-json php-pdo php-mysql php-redis php-memcached
+sudo apt-get install php-curl php-json php-mysql php-redis php-memcached
 ```
 
 ### macOS
@@ -131,7 +127,7 @@ apk add --no-cache autoconf automake libtool cmake g++ make file
 apk add --no-cache boost-dev
 
 # PHP 开发文件
-apk add --no-cache php-dev php-json php-curl php-pdo php-mysqli
+apk add --no-cache php-dev php-json php-curl php-mysqli
 ```
 
 ## 构建配置检查
@@ -205,7 +201,7 @@ ldconfig -p | grep boost
 php -v
 
 # 检查 PHP 扩展
-php -m | grep -E "json|curl|pdo|mysqli"
+php -m | grep -E "json|curl|mysqli"
 
 # 检查 PHP 开发文件
 phpize --version

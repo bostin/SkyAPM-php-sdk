@@ -2,30 +2,28 @@
 
 ## 快速开始
 
-### 选项 1：仅检查依赖项（推荐）
+### 依赖项检查
 
 上传并运行此脚本来检查您的 Amazon Linux 1 服务器：
 
 ```bash
 # 1. 上传脚本到服务器
-scp check_only.sh user@your-server:/tmp/
+scp check_dependencies.sh user@your-server:/tmp/
 
 # 2. 在服务器上运行
 ssh user@your-server
 cd /tmp
-chmod +x check_only.sh
-./check_only.sh
+chmod +x check_dependencies.sh
+./check_dependencies.sh
 ```
 
-### 选项 2：检查并自动安装依赖项
+### 关于检查脚本
 
-**警告**：此脚本会安装软件包，需要 sudo 权限
+**注意**：此脚本会检查所有依赖项并尝试安装缺失的软件包，需要 sudo 权限。
 
 ```bash
-# 1. 上传脚本到服务器
-scp check_dependencies_amazon_linux.sh user@your-server:/tmp/
-
-# 2. 在服务器上运行
+# 上传并运行依赖检查脚本
+scp check_dependencies.sh user@your-server:/tmp/
 ssh user@your-server
 cd /tmp
 chmod +x check_dependencies_amazon_linux.sh
@@ -87,7 +85,6 @@ sudo yum install -y php php-devel php-pear
 # 安装必需的 PHP 扩展
 sudo yum install -y php-json
 sudo yum install -y php-curl
-sudo yum install -y php-pdo
 sudo yum install -y php-mysql
 sudo yum install -y php-mysqli
 sudo yum install -y php-process
@@ -97,7 +94,6 @@ sudo yum install -y php-process
 - `php-devel` - PHP 开发头文件（必需）
 - `php-json` - JSON 扩展（必需）
 - `php-curl` - CURL 扩展（用于 HTTP 追踪）
-- `php-pdo` - PDO 数据库抽象层
 - `php-mysqli` - MySQL 改进扩展
 - `php-process` - 进程控制扩展
 
@@ -158,7 +154,7 @@ ldconfig -p | grep dl
 
 # 检查 PHP
 php -v
-php -m | grep -E "json|curl|pdo|mysqli"
+php -m | grep -E "json|curl|mysqli"
 
 # 检查 PHP 头文件
 find /usr/include -name "php_json.h"
@@ -267,7 +263,7 @@ sudo yum install -y https://rpms.remirepo.net/enterprise/remi-release-6.rpm
 sudo yum-config-manager --enable remi-php74
 
 # 安装 PHP 7.4
-sudo yum install -y php php-devel php-json php-curl php-pdo php-mysqli
+sudo yum install -y php php-devel php-json php-curl php-mysqli
 ```
 
 ### 3. SELinux
@@ -374,7 +370,6 @@ make -j$(nproc)
 | PHP | php-devel | PHP 开发文件 | 必需 |
 | PHP 扩展 | php-json | JSON 支持 | 必需 |
 | PHP 扩展 | php-curl | HTTP 追踪 | 必需 |
-| PHP 扩展 | php-pdo | 数据库追踪 | 必需 |
 | PHP 扩展 | php-mysqli | MySQL 追踪 | 可选 |
 | PHP 扩展 | php-pecl-redis | Redis 追踪 | 可选 |
 | PHP 扩展 | php-pecl-memcached | Memcached 追踪 | 可选 |
