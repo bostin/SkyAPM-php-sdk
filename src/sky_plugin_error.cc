@@ -79,11 +79,16 @@ void sky_plugin_error_cb(int type, const char *error_filename, const uint32_t er
 
     if (!SKYWALKING_G(is_swoole) && SKYWALKING_G(enable) && SKYWALKING_G(segment) != nullptr) {
         auto *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>SKYWALKING_G(segment);
-        auto segment = segments->at(0);
-        auto span = segment->firstSpan();
-        span->addLog(level, log);
-        if (isError) {
-            span->setIsError(true);
+        auto it = segments->find(0);
+        if (it != segments->end()) {
+            auto segment = it->second;
+            auto span = segment->firstSpan();
+            if (span != nullptr) {
+                span->addLog(level, log);
+                if (isError) {
+                    span->setIsError(true);
+                }
+            }
         }
     }
 

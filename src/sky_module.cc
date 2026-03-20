@@ -142,7 +142,12 @@ void sky_request_init(zval *request, uint64_t request_id) {
 
         header = (sw != nullptr ? Z_STRVAL_P(sw) : "");
 
-        uri = Z_STRVAL_P(zend_hash_str_find(Z_ARRVAL_P(swoole_server), "request_uri", sizeof("request_uri") - 1));
+        zval *uri_val = zend_hash_str_find(Z_ARRVAL_P(swoole_server), "request_uri", sizeof("request_uri") - 1);
+        if (uri_val != nullptr) {
+            uri = Z_STRVAL_P(uri_val);
+        } else {
+            uri = "/unknown";
+        }
 
         peer_val = zend_hash_str_find(Z_ARRVAL_P(swoole_header), "host", sizeof("host") - 1);
         if (peer_val != nullptr) {
@@ -152,10 +157,14 @@ void sky_request_init(zval *request, uint64_t request_id) {
             if (gethostname(hostname, sizeof(hostname))) {
                 hostname[0] = '\0';
             }
-            peer_val = zend_hash_str_find(Z_ARRVAL_P(swoole_server), "server_port", sizeof("server_port") - 1);
-            peer += hostname;
-            peer += ":";
-            peer += std::to_string(Z_LVAL_P(peer_val));
+            zval *port_val = zend_hash_str_find(Z_ARRVAL_P(swoole_server), "server_port", sizeof("server_port") - 1);
+            if (port_val != nullptr) {
+                peer += hostname;
+                peer += ":";
+                peer += std::to_string(Z_LVAL_P(port_val));
+            } else {
+                peer = hostname;
+            }
         }
     } else {
         zend_bool jit_initialization = PG(auto_globals_jit);
@@ -206,7 +215,7 @@ void sky_request_init(zval *request, uint64_t request_id) {
 static void write_trace_to_file(const std::string &json_str) {
     std::string log_file_path = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
 
-    // 确保日志目录存在
+    // 确保日志目录存在（忽略已存在错误）
     mkdir(log_file_path.c_str(), 0755);
 
     // 从 JSON 中提取 traceId（简单解析）
@@ -227,18 +236,27 @@ static void write_trace_to_file(const std::string &json_str) {
         std::to_string(now) + "-" + traceIdShort + "-" + std::to_string(getpid()) + ".json";
 
     // 写入文件
-    std::ofstream outfile(filename);
-    if (outfile.is_open()) {
+    std::ofstream outfile(filename, std::ios::out | std::ios::trunc);
+    if (outfile.good()) {
         outfile << json_str;
         outfile.close();
-        sky_log("write trace to file: " + filename);
+        if (outfile.good()) {
+            sky_log("write trace to file: " + filename);
+        } else {
+            sky_log("failed to write trace data to: " + filename);
+        }
     } else {
-        sky_log("failed to write trace file: " + filename);
+        sky_log("failed to open trace file: " + filename);
     }
 }
 
 void sky_request_flush(zval *response, uint64_t request_id) {
     auto *segment = sky_get_segment(nullptr, request_id);
+    if (segment == nullptr) {
+        sky_log("sky_request_flush: segment is null, skipping");
+        return;
+    }
+
     if (segment->skip()) {
         sky_log("segment skipped, deleting");
         delete segment;

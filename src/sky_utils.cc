@@ -50,8 +50,16 @@ std::string get_page_request_uri() {
         }
         carrier = zend_hash_str_find(&EG(symbol_table), ZEND_STRL("_SERVER"));
 
-        request_uri = zend_hash_str_find(Z_ARRVAL_P(carrier), "REQUEST_URI", sizeof("REQUEST_URI") - 1);
-        uri = Z_STRVAL_P(request_uri);
+        if (carrier != nullptr) {
+            request_uri = zend_hash_str_find(Z_ARRVAL_P(carrier), "REQUEST_URI", sizeof("REQUEST_URI") - 1);
+            if (request_uri != nullptr && Z_TYPE_P(request_uri) == IS_STRING) {
+                uri = Z_STRVAL_P(request_uri);
+            } else {
+                uri = "/unknown";
+            }
+        } else {
+            uri = "/unknown";
+        }
     }
     return uri;
 }
@@ -61,7 +69,7 @@ std::string get_page_request_peer() {
     zval *request_host;
     zval *request_port;
 
-    std::string peer;
+    std::string peer = "unknown";
 
     zend_bool jit_initialization = PG(auto_globals_jit);
 
@@ -72,14 +80,20 @@ std::string get_page_request_peer() {
     }
     carrier = zend_hash_str_find(&EG(symbol_table), ZEND_STRL("_SERVER"));
 
-    request_host = zend_hash_str_find(Z_ARRVAL_P(carrier), "HTTP_HOST", sizeof("HTTP_HOST") - 1);
-    request_port = zend_hash_str_find(Z_ARRVAL_P(carrier), "SERVER_PORT", sizeof("SERVER_PORT") - 1);
-    if (request_host == nullptr) {
-        request_host = zend_hash_str_find(Z_ARRVAL_P(carrier), "SERVER_ADDR", sizeof("SERVER_ADDR") - 1);
-    }
+    if (carrier != nullptr) {
+        request_host = zend_hash_str_find(Z_ARRVAL_P(carrier), "HTTP_HOST", sizeof("HTTP_HOST") - 1);
+        request_port = zend_hash_str_find(Z_ARRVAL_P(carrier), "SERVER_PORT", sizeof("SERVER_PORT") - 1);
+        if (request_host == nullptr) {
+            request_host = zend_hash_str_find(Z_ARRVAL_P(carrier), "SERVER_ADDR", sizeof("SERVER_ADDR") - 1);
+        }
 
-    if (request_host != nullptr && request_port != nullptr) {
-        peer = std::string(Z_STRVAL_P(request_host)) + ":" + Z_STRVAL_P(request_port);
+        if (request_host != nullptr && Z_TYPE_P(request_host) == IS_STRING) {
+            if (request_port != nullptr && Z_TYPE_P(request_port) == IS_STRING) {
+                peer = std::string(Z_STRVAL_P(request_host)) + ":" + Z_STRVAL_P(request_port);
+            } else {
+                peer = Z_STRVAL_P(request_host);
+            }
+        }
     }
 
     return peer;
@@ -114,7 +128,9 @@ int64_t sky_find_swoole_fd(zend_execute_data *execute_data) {
             if (Z_TYPE_P(sw_request) == IS_OBJECT) {
                 if (strcmp(ZSTR_VAL(Z_OBJ_P(sw_request)->ce->name), "Swoole\\Http\\Request") == 0) {
                     zval *fd = sky_read_property(sw_request, "fd", 0);
-                    return Z_LVAL_P(fd);
+                    if (fd != nullptr && Z_TYPE_P(fd) == IS_LONG) {
+                        return Z_LVAL_P(fd);
+                    }
                 }
             }
         }
