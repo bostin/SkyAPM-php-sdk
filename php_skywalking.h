@@ -153,9 +153,7 @@ ZEND_BEGIN_MODULE_GLOBALS(skywalking)
     // 实例标识
     char *instance_name;              // 实例名称（留空则自动生成）
 
-    // 存储后端配置
-    char *storage_backend;            // 存储后端：sqlite | json
-    char *db_path;                    // SQLite 数据库文件路径
+    // 数据清理配置
     zend_long retention_days;         // 数据保留天数（0 = 永久保留）
 ZEND_END_MODULE_GLOBALS(skywalking)
 

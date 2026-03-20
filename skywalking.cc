@@ -110,15 +110,6 @@ PHP_INI_BEGIN()
     // 用于标识服务实例，便于在分布式环境中识别
     STD_PHP_INI_ENTRY("skywalking.instance_name", "", PHP_INI_ALL, OnUpdateString, instance_name, zend_skywalking_globals, skywalking_globals)
 
-    // 存储后端：sqlite | json
-    // sqlite: 使用 SQLite 数据库存储（支持查询和聚合）
-    // json: 使用 JSON 文件存储（向后兼容）
-    STD_PHP_INI_ENTRY("skywalking.storage_backend", "json", PHP_INI_ALL, OnUpdateString, storage_backend, zend_skywalking_globals, skywalking_globals)
-
-    // SQLite 数据库文件路径
-    // 当 storage_backend=sqlite 时使用
-    STD_PHP_INI_ENTRY("skywalking.db_path", "/tmp/skywalking/traces.db", PHP_INI_ALL, OnUpdateString, db_path, zend_skywalking_globals, skywalking_globals)
-
     // 数据保留天数（0 = 永久保留）
     // 超过此天数的数据将被自动清理
     STD_PHP_INI_ENTRY("skywalking.retention_days", "7", PHP_INI_ALL, OnUpdateLong, retention_days, zend_skywalking_globals, skywalking_globals)
@@ -152,9 +143,7 @@ static void php_skywalking_init_globals(zend_skywalking_globals *skywalking_glob
     // uuid path
     skywalking_globals->instance_name = nullptr;
 
-    // storage backend
-    skywalking_globals->storage_backend = nullptr;
-    skywalking_globals->db_path = nullptr;
+    // data retention
     skywalking_globals->retention_days = 7;
 
 }

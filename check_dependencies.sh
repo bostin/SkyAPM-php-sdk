@@ -84,13 +84,6 @@ check_library "pthread"
 check_library "dl"
 check_library "rt"
 check_library "boost"
-
-# SQLite library (optional)
-if ldconfig -p 2>/dev/null | grep -q "libsqlite3"; then
-    print_result "PASS" "Library sqlite3 found (optional - enables SQLite storage backend)"
-else
-    echo -e "${YELLOW}⚠ Library sqlite3 NOT found (optional - JSON file storage will be used)${NC}"
-fi
 echo ""
 
 # PHP Environment
@@ -212,10 +205,6 @@ if [ $FAILED -eq 0 ]; then
     echo "  ./configure"
     echo "  make -j\$(nproc)"
     echo "  sudo make install"
-    echo ""
-    echo "Optional dependencies for enhanced features:"
-    echo "  - SQLite3 storage backend: yum install sqlite-devel (Amazon Linux)"
-    echo "                              apt-get install libsqlite3-dev (Ubuntu)"
     exit 0
 else
     echo -e "${RED}✗ Some required dependencies are missing${NC}"

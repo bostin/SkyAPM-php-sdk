@@ -37,10 +37,6 @@
 #include "storage/storage_interface.h"
 #include "storage/json_storage.h"
 
-#ifdef HAVE_SQLITE3
-#include "storage/sqlite_storage.h"
-#endif
-
 extern void (*ori_execute_ex)(zend_execute_data *execute_data);
 
 extern void (*ori_execute_internal)(zend_execute_data *execute_data, zval *return_value);
@@ -56,41 +52,11 @@ extern void (*orig_curl_close)(INTERNAL_FUNCTION_PARAMETERS);
 // 全局存储接口指针
 static StorageInterface* g_storage = nullptr;
 
-// 创建存储后端实例
+// 创建存储后端实例（仅支持 JSON 文件存储）
 static StorageInterface* create_storage_backend() {
-    std::string backend = SKYWALKING_G(storage_backend) ? SKYWALKING_G(storage_backend) : "json";
-
-#ifdef HAVE_SQLITE3
-    if (backend == "sqlite") {
-        std::string dbPath = SKYWALKING_G(db_path) ? SKYWALKING_G(db_path) : "/tmp/skywalking/traces.db";
-        if (SKYWALKING_G(log_enable)) {
-            sky_log("Creating SQLite storage backend: " + dbPath);
-        }
-        auto* storage = new SQLiteStorage(dbPath);
-        if (!storage->initialize()) {
-            if (SKYWALKING_G(log_enable)) {
-                sky_log("Failed to initialize SQLite storage, falling back to JSON storage");
-            }
-            delete storage;
-            // 降级到 JSON 存储
-            std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
-            return new JsonStorage(logPath);
-        }
-        return storage;
-    }
-#else
-    // 没有SQLite支持时，如果用户配置了sqlite，发出警告并降级到JSON
-    if (backend == "sqlite") {
-        if (SKYWALKING_G(log_enable)) {
-            sky_log("SQLite support not compiled in, falling back to JSON storage");
-        }
-    }
-#endif
-
-    // 默认使用 JSON 存储
     std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
     if (SKYWALKING_G(log_enable)) {
-        sky_log("Creating JSON storage backend: " + logPath);
+        sky_log("Creating JSON file storage backend: " + logPath);
     }
     auto* storage = new JsonStorage(logPath);
     storage->initialize();
@@ -144,7 +110,7 @@ void sky_module_init(struct service_info *info) {
 
     Manager::setupServiceInfo(opt, info);
 
-    // 初始化存储后端
+    // 初始化存储后端（仅 JSON 文件存储）
     g_storage = create_storage_backend();
 
     // 使用原子文件创建替代文件锁机制
@@ -167,16 +133,6 @@ void sky_module_init(struct service_info *info) {
             sky_log("service: " + std::string(info->service));
             sky_log("service_instance: " + std::string(info->service_instance));
             sky_log("log_file_path: " + opt.log_file_path);
-
-            // 输出存储后端信息
-            std::string backend = SKYWALKING_G(storage_backend) ? SKYWALKING_G(storage_backend) : "json";
-            sky_log("storage_backend: " + backend);
-
-            if (backend == "sqlite") {
-                std::string dbPath = SKYWALKING_G(db_path) ? SKYWALKING_G(db_path) : "/tmp/skywalking/traces.db";
-                sky_log("sqlite_db_path: " + dbPath);
-            }
-
             sky_log("the apache skywalking php plugin mounted (direct file write mode)");
 
             // 写入 PID（用于调试，可选）
