@@ -249,10 +249,8 @@ PHP_RINIT_FUNCTION(skywalking)
 	ZEND_TSRMLS_CACHE_UPDATE();
 #endif
     if (SKYWALKING_G(enable)) {
-        // 支持 PHP-FPM 和 CLI 模式
-        if (strcasecmp("fpm-fcgi", sapi_module.name) == 0 ||
-            strcasecmp("cli", sapi_module.name) == 0) {
-
+        // 只在 PHP-FPM 环境下自动初始化追踪
+        if (strcasecmp("fpm-fcgi", sapi_module.name) == 0) {
             if (strlen(s_info->service_instance) == 0) {
                 sky_log("service_instance is empty, skip tracing");
                 return SUCCESS;
@@ -269,10 +267,8 @@ PHP_RINIT_FUNCTION(skywalking)
 PHP_RSHUTDOWN_FUNCTION(skywalking)
 {
 	if (SKYWALKING_G(enable)) {
-        // 支持 PHP-FPM 和 CLI 模式
-        if (strcasecmp("fpm-fcgi", sapi_module.name) == 0 ||
-            strcasecmp("cli", sapi_module.name) == 0) {
-
+        // 只在 PHP-FPM 环境下自动刷新追踪数据
+        if (strcasecmp("fpm-fcgi", sapi_module.name) == 0) {
             if (SKYWALKING_G(segment) == nullptr) {
                 return SUCCESS;
             }
