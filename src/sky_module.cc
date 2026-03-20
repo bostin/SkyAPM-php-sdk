@@ -35,8 +35,11 @@
 #include "sky_log.h"
 #include "sky_rate_limit.h"
 #include "storage/storage_interface.h"
-#include "storage/sqlite_storage.h"
 #include "storage/json_storage.h"
+
+#ifdef HAVE_SQLITE3
+#include "storage/sqlite_storage.h"
+#endif
 
 extern void (*ori_execute_ex)(zend_execute_data *execute_data);
 
