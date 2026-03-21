@@ -155,6 +155,12 @@ ZEND_BEGIN_MODULE_GLOBALS(skywalking)
 
     // 数据清理配置
     zend_long retention_days;         // 数据保留天数（0 = 永久保留）
+
+    // 存储类型配置
+    char *storage_type;              // 存储类型：sqlite（默认）或 json
+
+    // SQLite 配置
+    zend_long sqlite_max_size_mb;   // SQLite 数据库最大大小（MB，0 = 不限制）
 ZEND_END_MODULE_GLOBALS(skywalking)
 
 extern ZEND_DECLARE_MODULE_GLOBALS(skywalking);

@@ -114,6 +114,16 @@ PHP_INI_BEGIN()
     // 超过此天数的数据将被自动清理
     STD_PHP_INI_ENTRY("skywalking.retention_days", "7", PHP_INI_ALL, OnUpdateLong, retention_days, zend_skywalking_globals, skywalking_globals)
 
+    // 存储类型：sqlite（默认）或 json
+    // sqlite: 使用 SQLite 数据库存储，查询能力强，性能好
+    // json: 使用 JSON 文件存储，向后兼容
+    STD_PHP_INI_ENTRY("skywalking.storage_type", "sqlite", PHP_INI_ALL, OnUpdateString, storage_type, zend_skywalking_globals, skywalking_globals)
+
+    // SQLite 数据库最大大小（MB）
+    // 0 = 不限制
+    // 当数据库超过此大小时，会自动执行清理
+    STD_PHP_INI_ENTRY("skywalking.sqlite_max_size_mb", "0", PHP_INI_ALL, OnUpdateLong, sqlite_max_size_mb, zend_skywalking_globals, skywalking_globals)
+
 PHP_INI_END()
 
 // 初始化全局变量默认值
@@ -145,6 +155,10 @@ static void php_skywalking_init_globals(zend_skywalking_globals *skywalking_glob
 
     // data retention
     skywalking_globals->retention_days = 7;
+
+    // storage
+    skywalking_globals->storage_type = nullptr;
+    skywalking_globals->sqlite_max_size_mb = 0;
 
 }
 

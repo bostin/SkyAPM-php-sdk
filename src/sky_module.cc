@@ -36,6 +36,9 @@
 #include "sky_rate_limit.h"
 #include "storage/storage_interface.h"
 #include "storage/json_storage.h"
+#ifdef HAVE_SQLITE3
+#include "storage/sqlite_storage.h"
+#endif
 
 extern void (*ori_execute_ex)(zend_execute_data *execute_data);
 
@@ -52,10 +55,29 @@ extern void (*orig_curl_close)(INTERNAL_FUNCTION_PARAMETERS);
 // 全局存储接口指针
 static StorageInterface* g_storage = nullptr;
 
-// 创建存储后端实例（仅支持 JSON 文件存储）
+// 创建存储后端实例
 static StorageInterface* create_storage_backend() {
     std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
-    auto* storage = new JsonStorage(logPath);
+    std::string storageType = SKYWALKING_G(storage_type) ? SKYWALKING_G(storage_type) : "sqlite";
+
+    StorageInterface* storage = nullptr;
+
+#ifdef HAVE_SQLITE3
+    if (storageType == "sqlite") {
+        // 使用 SQLite 数据库存储
+        std::string dbPath = logPath + "/skywalking_traces.db";
+        int maxSizeMB = SKYWALKING_G(sqlite_max_size_mb);
+        storage = new SqliteStorage(dbPath, true, maxSizeMB);
+        if (storage->initialize()) {
+            return storage;
+        }
+        delete storage;
+        // SQLite 初始化失败，回退到 JSON 文件
+    }
+#endif
+
+    // 默认或 JSON 模式：使用 JSON 文件存储
+    storage = new JsonStorage(logPath);
     storage->initialize();
     return storage;
 }
@@ -145,7 +167,13 @@ void sky_module_init(struct service_info *info) {
                 sky_log("service: " + std::string(info->service));
                 sky_log("service_instance: " + std::string(info->service_instance));
                 sky_log("log_file_path: " + opt.log_file_path);
-                sky_log("storage: JSON file backend");
+
+                // 获取实际使用的存储类型
+                const char* storageType = SKYWALKING_G(storage_type) ? SKYWALKING_G(storage_type) : "sqlite";
+                #ifndef HAVE_SQLITE3
+                storageType = "json";
+                #endif
+                sky_log("storage: " + std::string(storageType) + " backend");
                 sky_log("the apache skywalking php plugin mounted");
 
                 // 写入 PID（用于调试，可选）

@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SkyAPM PHP is a PHP extension (C++) that provides distributed tracing instrumentation for Apache SkyWalking. It intercepts PHP function calls using the Zend Engine to automatically collect traces without requiring application code changes.
 
-**Current Branch:** `v4.2.0_local` - Local file-based version without gRPC library dependencies
+**Current Branch:** `v4.2.0_local_v2` - SQLite single-file storage version
 
 ### Web Visualization System
 
 - **`visualization/frontend/`** - Vue 3 frontend application
 - **`visualization/server/`** - Node.js Express API server
 - **Technology Stack**: Vue 3 + TypeScript + Element Plus (frontend), Node.js + Express (backend)
-- **Data Source**: Reads JSON trace files from `output/` directory
+- **Data Source**: SQLite database (default) or JSON files (legacy)
 
 ## Architecture
 
@@ -63,7 +63,7 @@ Instrumentation for specific libraries is implemented via plugins in `src/sky_pl
 sudo yum groupinstall -y "Development Tools"
 sudo yum install -y autoconf automake libtool make gcc-c++
 sudo yum install -y boost-devel boost-static
-sudo yum install -y libcurl-devel openssl-devel
+sudo yum install -y libcurl-devel openssl-devel sqlite-devel
 sudo yum install -y php php-devel php-pear
 sudo yum install -y php-json php-curl php-process
 ```
@@ -71,19 +71,19 @@ sudo yum install -y php-json php-curl php-process
 **Linux (Ubuntu/Debian):**
 ```bash
 sudo apt-get install build-essential autoconf automake libtool make g++
-sudo apt-get install libboost-all-dev libcurl-dev openssl-dev
+sudo apt-get install libboost-all-dev libcurl-dev openssl-dev libsqlite3-dev
 sudo apt-get install php php-dev php-json php-curl
 ```
 
 **macOS:**
 ```bash
 xcode-select --install
-brew install autoconf automake libtool boost
+brew install autoconf automake libtool boost sqlite3
 ```
 
 **Alpine:**
 ```bash
-apk add --no-cache autoconf automake libtool cmake g++ make file linux-headers re2c pkgconf openssl curl boost-dev php-dev php-json php-curl
+apk add --no-cache autoconf automake libtool cmake g++ make file linux-headers re2c pkgconf openssl curl boost-dev php-dev php-json php-curl sqlite-dev
 ```
 
 ### Build PHP Extension
@@ -106,8 +106,11 @@ skywalking.enable = 1
 skywalking.version = 8
 skywalking.app_code = my_application
 skywalking.log_file_path = /var/log/skywalking
-skywalking.log_file_max_size = 10485760
-skywalking.log_file_max_files = 100
+
+; Storage configuration
+skywalking.storage_type = sqlite     ; sqlite (default) or json (legacy)
+skywalking.sqlite_max_size_mb = 1024 ; Max SQLite database size (0 = unlimited)
+skywalking.retention_days = 7        ; Data retention in days (0 = permanent)
 ```
 
 ## Dependency Check Script
@@ -209,6 +212,42 @@ GitHub Actions (`.github/workflows/ci.yml`) tests against:
 **Added:** JSON-based protocol using `src/json_builder.cc/h`
 **Benefits:** Simpler build process, fewer dependencies, easier deployment
 
+### Storage System (v4.2.0_local_v2)
+
+The extension supports two storage backends:
+- **SQLite** (default): Single-file database storage with SQL query capabilities
+- **JSON** (legacy): Multi-file JSON storage for backward compatibility
+
+**Storage Files:**
+- `src/storage/storage_interface.h` - Storage abstraction interface
+- `src/storage/sqlite_storage.cc/h` - SQLite storage implementation
+- `src/storage/json_storage.cc/h` - JSON file storage (legacy)
+
+**SQLite Benefits:**
+- Single file storage (no inode exhaustion)
+- SQL query support for analytics
+- WAL mode for better concurrency
+- Built-in indexing for fast lookups
+
+**Database Schema:**
+```sql
+CREATE TABLE traces (
+    id INTEGER PRIMARY KEY,
+    trace_id TEXT UNIQUE,
+    trace_segment_id TEXT,
+    service TEXT,
+    service_instance TEXT,
+    start_time INTEGER,
+    end_time INTEGER,
+    duration_ms INTEGER,
+    status_code INTEGER,
+    is_error INTEGER,
+    url TEXT,
+    full_json TEXT,
+    created_at INTEGER
+);
+```
+
 ## Supported Frameworks and Libraries
 
 - **HTTP**: CURL (ext-curl), Guzzle (via Hyperf plugin), Swoole CURL
@@ -222,10 +261,11 @@ GitHub Actions (`.github/workflows/ci.yml`) tests against:
 
 ### Amazon Linux 1 + PHP 7.0 NTS
 
-This branch (`v4.2.0_local`) is optimized for:
+This branch (`v4.2.0_local_v2`) is optimized for:
 - **OS**: Amazon Linux 1
 - **PHP**: 7.0 Non-Thread Safe (NTS)
 - **Removed Dependencies**: PDO, gRPC plugins
+- **New Dependency**: SQLite3 library
 
 Ensure PHP is non-ZTS:
 ```bash
@@ -280,6 +320,12 @@ sudo apt-get install php-dev php-json  # Ubuntu
 ```bash
 sudo yum install boost-devel  # Amazon Linux
 sudo apt-get install libboost-all-dev  # Ubuntu
+```
+
+**SQLite3 library not found:**
+```bash
+sudo yum install sqlite-devel  # Amazon Linux
+sudo apt-get install libsqlite3-dev  # Ubuntu
 ```
 
 **C++11 not supported:**
