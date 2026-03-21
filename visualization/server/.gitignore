@@ -1,0 +1,6 @@
+https://www.typescriptlang.org/
+node_modules
+dist
+.env
+*.log
+.DS_Store
