@@ -8,6 +8,13 @@ SkyAPM PHP is a PHP extension (C++) that provides distributed tracing instrument
 
 **Current Branch:** `v4.2.0_local` - Local file-based version without gRPC library dependencies
 
+### Web Visualization System
+
+- **`visualization/frontend/`** - Vue 3 frontend application
+- **`visualization/server/`** - Node.js Express API server
+- **Technology Stack**: Vue 3 + TypeScript + Element Plus (frontend), Node.js + Express (backend)
+- **Data Source**: Reads JSON trace files from `output/` directory
+
 ## Architecture
 
 This is a **PHP extension written in C++** that uses JSON-based protocol to communicate with SkyWalking OAP server. The architecture consists of:
@@ -119,6 +126,42 @@ This script verifies:
 - Required PHP extensions (json, curl)
 - PHP development headers
 - C++11 support
+
+## Running the Visualization System
+
+### Development Mode
+
+**Frontend:**
+```bash
+cd visualization/frontend
+pnpm install
+pnpm dev
+# Runs on http://localhost:5173
+```
+
+**Backend:**
+```bash
+cd visualization/server
+pnpm install
+pnpm dev
+# Runs on http://localhost:3000
+```
+
+### Production Deployment
+
+1. Build the frontend:
+```bash
+cd visualization/frontend
+pnpm build
+```
+
+2. Start the backend (serves both API and static files):
+```bash
+cd visualization/server
+pnpm build && pnpm start
+```
+
+3. Access the application at http://localhost:3000
 
 ## Testing
 
