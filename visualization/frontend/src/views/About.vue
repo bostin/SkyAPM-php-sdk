@@ -1,9 +1,9 @@
 <template>
   <div class="about-container">
     <el-card>
-      <h2>SkyWalking PHP 可视化系统</h2>
+      <h2>PHP 追踪可视化系统</h2>
       <p>版本: 1.0.0</p>
-      <p>用于可视化 SkyWalking PHP SDK 生成的追踪数据。</p>
+      <p>用于可视化 PHP 应用生成的分布式追踪数据。</p>
 
       <h3>功能特性</h3>
       <el-list>
