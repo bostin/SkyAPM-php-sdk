@@ -45,6 +45,26 @@
             @change="handleFilterChange"
             class="datetime-picker"
           />
+
+          <el-input-number
+            v-model="filterParams.minDuration"
+            :min="0"
+            :step="100"
+            placeholder="最小耗时"
+            controls-position="right"
+            @change="handleFilterChange"
+            class="duration-input"
+          />
+
+          <el-input-number
+            v-model="filterParams.maxDuration"
+            :min="0"
+            :step="100"
+            placeholder="最大耗时"
+            controls-position="right"
+            @change="handleFilterChange"
+            class="duration-input"
+          />
         </div>
       </div>
     </el-card>
@@ -73,7 +93,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="duration" label="耗时" width="100" sortable="custom">
+        <el-table-column prop="duration" label="耗时(ms)" width="100" sortable="custom">
           <template #default="{ row }">
             <el-text :type="getDurationType(row.duration)">
               {{ row.duration }}
@@ -145,6 +165,8 @@ interface FilterParams {
   url: string
   startTime: string | null
   endTime: string | null
+  minDuration: number | null
+  maxDuration: number | null
 }
 
 const router = useRouter()
@@ -153,7 +175,9 @@ const loading = ref(false)
 const filterParams = reactive<FilterParams>({
   url: '',
   startTime: null,
-  endTime: null
+  endTime: null,
+  minDuration: null,
+  maxDuration: null
 })
 const pagination = reactive<Pagination>({
   total: 0,
@@ -199,6 +223,14 @@ const fetchData = async () => {
     }
     if (filterParams.endTime) {
       params.endTime = new Date(filterParams.endTime).getTime()
+    }
+
+    // 处理耗时区间筛选
+    if (filterParams.minDuration != null && filterParams.minDuration > 0) {
+      params.minDuration = filterParams.minDuration
+    }
+    if (filterParams.maxDuration != null && filterParams.maxDuration > 0) {
+      params.maxDuration = filterParams.maxDuration
     }
 
     // 处理排序
@@ -302,6 +334,11 @@ onMounted(() => {
 .pagination {
   margin-top: 20px;
   text-align: right;
+}
+
+.duration-input {
+  width: 130px;
+  flex-shrink: 0;
 }
 
 /* 确保表头排序按钮和文本在一行显示 */
