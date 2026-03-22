@@ -154,8 +154,11 @@ void sky_module_init(struct service_info *info) {
 
     Manager::setupServiceInfo(opt, info);
 
-    // 初始化存储后端（确保在当前进程中有效）
-    ensure_storage_valid();
+    // 注意：不在 MINIT 中初始化存储后端！
+    // 在 PHP-FPM master-worker 模式下，master 进程 fork 出 worker
+    // 如果在 master 中初始化 g_storage，worker 继承后会检测到 PID 不匹配
+    // 导致每个 worker 第一次处理请求时都重新初始化
+    // 正确的做法是：只在 worker 处理请求时初始化（通过 sky_request_init 中的 ensure_storage_valid）
 
     // 使用原子文件创建替代文件锁机制
     // O_CREAT | O_EXCL 是内核级原子操作，确保只有一个进程输出初始化日志
