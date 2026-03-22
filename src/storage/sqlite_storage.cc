@@ -50,6 +50,11 @@ SqliteStorage::~SqliteStorage() {
 bool SqliteStorage::initialize() {
     std::lock_guard<std::mutex> lock(dbMutex_);
 
+    // 防止重复初始化
+    if (initialized_) {
+        return true;
+    }
+
     // 打开或创建数据库
     int rc = sqlite3_open(dbPath_.c_str(), &db_);
     if (rc != SQLITE_OK) {
@@ -131,6 +136,9 @@ void SqliteStorage::shutdown() {
         sqlite3_close(db_);
         db_ = nullptr;
     }
+
+    // 重置初始化标志，允许重新初始化
+    initialized_ = false;
 }
 
 bool SqliteStorage::initTables() {
