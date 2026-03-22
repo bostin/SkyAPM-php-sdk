@@ -16,7 +16,6 @@
  */
 
 
-#include <regex>
 #include "sky_pdo.h"
 #include "sky_utils.h"
 #include "sky_core_span_log.h"
@@ -103,24 +102,31 @@ std::string sky_pdo_dbh_peer(Span *span, pdo_dbh_t *dbh) {
 
     if (dbh->data_source != nullptr) {
         span->addTag("db.data_source", dbh->data_source);
-        std::regex ws_re(";");
-        std::regex kv_re("=");
         std::string source(dbh->data_source);
-        std::vector<std::string> items(std::sregex_token_iterator(source.begin(), source.end(), ws_re, -1), std::sregex_token_iterator());
 
         std::string host("not_found");
         std::string port("3306");
 
-        for (auto item:items) {
-            std::vector<std::string> kv(std::sregex_token_iterator(item.begin(), item.end(), kv_re, -1), std::sregex_token_iterator());
-            if (kv.size() >= 2) {
-                if (kv[0] == "host") {
-                    host = kv[1];
-                }
-                if (kv[0] == "port") {
-                    port = kv[1];
+        // Simple string parsing without std::regex (for GCC 4.8 compatibility)
+        size_t pos = 0;
+        while (pos < source.length()) {
+            size_t semicolon_pos = source.find(';', pos);
+            size_t end_pos = (semicolon_pos == std::string::npos) ? source.length() : semicolon_pos;
+
+            std::string item = source.substr(pos, end_pos - pos);
+            size_t eq_pos = item.find('=');
+            if (eq_pos != std::string::npos) {
+                std::string key = item.substr(0, eq_pos);
+                std::string value = item.substr(eq_pos + 1);
+                if (key == "host") {
+                    host = value;
+                } else if (key == "port") {
+                    port = value;
                 }
             }
+
+            if (semicolon_pos == std::string::npos) break;
+            pos = semicolon_pos + 1;
         }
 
         return host + ":" + port;
