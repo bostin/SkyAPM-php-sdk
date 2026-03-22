@@ -39,7 +39,8 @@ SqliteStorage::SqliteStorage(const std::string& dbPath, bool walMode, int maxSiz
     , stmtMinMaxTime_(nullptr)
     , totalTraces_(0)
     , lastCleanupTime_(0)
-    , lastCompactionTime_(0) {
+    , lastCompactionTime_(0)
+    , initialized_(false) {
 }
 
 SqliteStorage::~SqliteStorage() {
@@ -106,10 +107,12 @@ bool SqliteStorage::initialize() {
         sqlite3_finalize(stmt);
     }
 
-    if (SKYWALKING_G(log_enable)) {
+    // 只在首次初始化时打印日志，防止 PHP-FPM 多 worker 环境下重复输出
+    if (!initialized_ && SKYWALKING_G(log_enable)) {
         sky_log("SqliteStorage: initialized, database=" + dbPath_ +
                 ", traces=" + std::to_string(totalTraces_.load()));
     }
+    initialized_ = true;
 
     return true;
 }

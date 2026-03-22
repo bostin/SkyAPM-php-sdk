@@ -122,6 +122,7 @@ private:
     std::atomic<int64_t> totalTraces_;
     int64_t lastCleanupTime_;
     int64_t lastCompactionTime_;
+    bool initialized_;  // 防止重复打印初始化日志
 
     /**
      * 初始化数据库表
