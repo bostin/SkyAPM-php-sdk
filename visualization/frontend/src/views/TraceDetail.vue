@@ -45,6 +45,33 @@
       <template #header>
         <div class="card-header">
           <span class="card-title">调用链瀑布图</span>
+          <div class="filter-controls">
+            <el-input-number
+              v-model="minDuration"
+              :min="0"
+              :step="10"
+              placeholder="最小耗时(ms)"
+              class="duration-input"
+              @change="handleFilterChange"
+            />
+            <el-select
+              v-model="selectedDbTypes"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="DB 类型筛选"
+              class="db-type-select"
+              @change="handleFilterChange"
+            >
+              <el-option
+                v-for="dbType in availableDbTypes"
+                :key="dbType"
+                :label="dbType"
+                :value="dbType"
+              />
+            </el-select>
+            <el-button @click="resetFilters">重置</el-button>
+          </div>
         </div>
       </template>
 
@@ -154,11 +181,53 @@ const route = useRoute()
 const trace = ref<any>(null)
 const spans = ref<any[]>([])
 const chartWrapper = ref<HTMLElement | null>(null)
+const minDuration = ref<number>(0)
+const selectedDbTypes = ref<string[]>([])
+
+// 收集所有 db.type
+const availableDbTypes = computed(() => {
+  const dbTypes = new Set<string>()
+  spans.value.forEach((span: any) => {
+    if (span.tags) {
+      span.tags.forEach((tag: any) => {
+        if (tag.key === 'db.type') {
+          dbTypes.add(tag.value)
+        }
+      })
+    }
+  })
+  return Array.from(dbTypes).sort()
+})
 
 const sortedSpans = computed(() => {
   if (!spans.value) return []
   return [...spans.value].sort((a, b) => a.startTime - b.startTime)
 })
+
+// 检查 span 是否匹配过滤条件
+const spanMatchesFilter = (span: any): boolean => {
+  // 耗时过滤
+  if (minDuration.value > 0 && span.duration < minDuration.value) {
+    return false
+  }
+
+  // db.type 过滤
+  if (selectedDbTypes.value.length > 0) {
+    let spanDbType = ''
+    if (span.tags) {
+      span.tags.forEach((tag: any) => {
+        if (tag.key === 'db.type') {
+          spanDbType = tag.value
+        }
+      })
+    }
+    if (!selectedDbTypes.value.includes(spanDbType)) {
+      return false
+    }
+  }
+
+  return true
+}
 
 // 构建带有depth的扁平化span列表，用于瀑布图显示
 const flattenedSpans = computed(() => {
@@ -203,7 +272,14 @@ const flattenedSpans = computed(() => {
     return result
   }
 
-  return flatten(rootSpans)
+  const allFlattened = flatten(rootSpans)
+
+  // 应用过滤条件
+  if (minDuration.value > 0 || selectedDbTypes.value.length > 0) {
+    return allFlattened.filter(spanMatchesFilter)
+  }
+
+  return allFlattened
 })
 
 const duration = computed(() => {
@@ -298,6 +374,15 @@ const goBack = () => {
   router.back()
 }
 
+const handleFilterChange = () => {
+  // 过滤变化时自动应用，不需要额外操作
+}
+
+const resetFilters = () => {
+  minDuration.value = 0
+  selectedDbTypes.value = []
+}
+
 const copyToClipboard = async (text: string) => {
   try {
     await navigator.clipboard.writeText(text)
@@ -351,6 +436,20 @@ onMounted(() => {
 
 .chart-card {
   margin-top: 20px;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.duration-input {
+  width: 140px;
+}
+
+.db-type-select {
+  width: 180px;
 }
 
 .chart-container {
