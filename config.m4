@@ -40,20 +40,14 @@ fi
 # 检查 SQLite3
 AC_MSG_CHECKING([for sqlite3])
 have_sqlite3="no"
-PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.7.0], [
+
+# 直接使用 AC_CHECK_LIB 检查 sqlite3 库
+AC_CHECK_LIB([sqlite3], [sqlite3_open], [
   have_sqlite3="yes"
-  PHP_EVAL_LIBLINE($SQLITE3_LIBS, SKYWALKING_SHARED_LIBADD)
-  PHP_EVAL_INCLINE($SQLITE3_CFLAGS)
+  PHP_ADD_LIBRARY(sqlite3,,SKYWALKING_SHARED_LIBADD)
   AC_DEFINE([HAVE_SQLITE3], 1, [Enable SQLite3 support])
 ], [
-  # 回退：使用系统自带的 sqlite3
-  AC_CHECK_LIB([sqlite3], [sqlite3_open], [
-    have_sqlite3="yes"
-    PHP_ADD_LIBRARY(sqlite3,,SKYWALKING_SHARED_LIBADD)
-    AC_DEFINE([HAVE_SQLITE3], 1, [Enable SQLite3 support])
-  ], [
-    have_sqlite3="no"
-  ])
+  have_sqlite3="no"
 ])
 
 if test "$have_sqlite3" = "no"; then
