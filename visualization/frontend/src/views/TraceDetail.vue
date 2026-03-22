@@ -41,7 +41,7 @@
       </div>
     </el-card>
 
-    <el-card class="chart-card">
+    <el-card class="chart-card" v-loading="loading">
       <template #header>
         <div class="card-header">
           <span class="card-title">调用链瀑布图</span>
@@ -183,6 +183,7 @@ const spans = ref<any[]>([])
 const chartWrapper = ref<HTMLElement | null>(null)
 const minDuration = ref<number>(0)
 const selectedDbTypes = ref<string[]>([])
+const loading = ref(false)
 
 // 收集所有 db.type
 const availableDbTypes = computed(() => {
@@ -392,6 +393,7 @@ const copyToClipboard = async (text: string) => {
 }
 
 const fetchTrace = async () => {
+  loading.value = true
   const traceId = route.query.traceId || route.params.traceId
   try {
     const response = await axios.get(`/api/traces/${traceId}`)
@@ -406,6 +408,8 @@ const fetchTrace = async () => {
     }
   } catch (error) {
     console.error('Error fetching trace:', error)
+  } finally {
+    loading.value = false
   }
 }
 
