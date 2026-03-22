@@ -37,6 +37,9 @@ const DATA_SOURCE = process.env.DATA_SOURCE || 'sqlite'; // 'sqlite' or 'json'
 // 配置 - 数据目录
 const TRACE_DIR = path.resolve(__dirname, '../../..', 'output');
 
+// SQLite 数据库路径配置
+const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, '../../..', 'skywalking_traces.db');
+
 // 中间件
 app.use(cors());
 app.use(express.json());
@@ -49,7 +52,7 @@ let cacheTime = 0;
 // 初始化数据库（SQLite 模式）
 let dbInitialized = false;
 if (DATA_SOURCE === 'sqlite') {
-    initDatabase();
+    initDatabase(DB_PATH);
     dbInitialized = true;
 }
 
@@ -346,7 +349,7 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Data source: ${DATA_SOURCE}`);
     if (DATA_SOURCE === 'sqlite') {
-        console.log(`SQLite database: ${path.resolve(__dirname, '../../..', 'skywalking_traces.db')}`);
+        console.log(`SQLite database: ${DB_PATH}`);
     } else {
         console.log(`Trace directory: ${TRACE_DIR}`);
     }
