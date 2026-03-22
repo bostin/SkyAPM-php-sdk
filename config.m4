@@ -37,6 +37,23 @@ else
   AC_MSG_RESULT([found in $json_inc_path])
 fi
 
+# 检查 SQLite3
+AC_MSG_CHECKING([for sqlite3])
+have_sqlite3="no"
+
+# 直接使用 AC_CHECK_LIB 检查 sqlite3 库
+AC_CHECK_LIB([sqlite3], [sqlite3_open], [
+  have_sqlite3="yes"
+  PHP_ADD_LIBRARY(sqlite3,,SKYWALKING_SHARED_LIBADD)
+  AC_DEFINE([HAVE_SQLITE3], 1, [Enable SQLite3 support])
+], [
+  have_sqlite3="no"
+])
+
+if test "$have_sqlite3" = "no"; then
+  AC_MSG_WARN([SQLite3 library not found, SQLite storage will be disabled])
+fi
+
 if test "$PHP_SKYWALKING" != "no"; then
 
   LIBS="-lpthread $LIBS"
@@ -90,6 +107,7 @@ if test "$PHP_SKYWALKING" != "no"; then
       src/tag.cc \
       src/json_builder.cc \
       src/storage/json_storage.cc \
+      src/storage/sqlite_storage.cc \
   , $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1, cxx)
 fi
 

@@ -46,6 +46,30 @@ PHP Request → Segment → JSON Serialization → Message Queue → File Logger
 1. Tars-php ([Tars-php](https://github.com/TarsPHP/TarsPHP))
 1. LaravelS ([LaravelS](https://github.com/hhxsv5/laravel-s))
 
+## Web Visualization
+
+This project includes a modern web-based visualization system for viewing and analyzing PHP distributed traces.
+
+**Quick Start:**
+```bash
+# Frontend development
+cd visualization/frontend && pnpm install && pnpm dev
+
+# Backend API server
+cd visualization/server && pnpm install && pnpm dev
+```
+
+Access the visualization interface at http://localhost:5173 (development) or http://localhost:3000 (production).
+
+**Features:**
+- 📊 Trace list with pagination and filtering
+- 📈 Call chain waterfall chart
+- 🔍 URL search and time range filtering
+- 🎨 Color-coded spans by duration
+- 💡 Detailed tooltips with span information
+
+For more details, see [visualization/README.md](visualization/README.md)
+
 ## Documents
 * [Documents in English](docs/README.md)
 

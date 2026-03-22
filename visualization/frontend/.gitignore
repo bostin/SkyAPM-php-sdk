@@ -1,0 +1,14 @@
+# VS Code settings
+.vscode
+dist
+node_modules
+.env
+*.log
+.DS_Store
+
+# Build files
+dist-ssr
+coverage
+
+# Local env files
+.env*.local

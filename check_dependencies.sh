@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SkyAPM PHP SDK - Dependency Check Script for Amazon Linux 1 + PHP 7.0 NTS
-# Simplified version without pdo/grpc checks
+# Version: v4.2.0_local_v2 (includes SQLite3 storage)
 
 # Color codes for output
 RED='\033[0;31m'
@@ -84,6 +84,7 @@ check_library "pthread"
 check_library "dl"
 check_library "rt"
 check_library "boost"
+check_library "sqlite3"
 echo ""
 
 # PHP Environment

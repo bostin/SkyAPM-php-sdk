@@ -25,6 +25,7 @@
 #include <random>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <atomic>
 
 #include "segment.h"
 #include "sky_utils.h"
@@ -36,6 +37,9 @@
 #include "sky_rate_limit.h"
 #include "storage/storage_interface.h"
 #include "storage/json_storage.h"
+#ifdef HAVE_SQLITE3
+#include "storage/sqlite_storage.h"
+#endif
 
 extern void (*ori_execute_ex)(zend_execute_data *execute_data);
 
@@ -52,12 +56,55 @@ extern void (*orig_curl_close)(INTERNAL_FUNCTION_PARAMETERS);
 // 全局存储接口指针
 static StorageInterface* g_storage = nullptr;
 
-// 创建存储后端实例（仅支持 JSON 文件存储）
+// 记录 g_storage 所属的进程 PID（用于检测 worker 是否需要重新初始化）
+static std::atomic<pid_t> g_storage_pid(0);
+
+// 创建存储后端实例
 static StorageInterface* create_storage_backend() {
     std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
-    auto* storage = new JsonStorage(logPath);
+    std::string storageType = SKYWALKING_G(storage_type) ? SKYWALKING_G(storage_type) : "sqlite";
+
+    StorageInterface* storage = nullptr;
+
+#ifdef HAVE_SQLITE3
+    if (storageType == "sqlite") {
+        // 使用 SQLite 数据库存储
+        std::string dbPath = logPath + "/skywalking_traces.db";
+        int maxSizeMB = SKYWALKING_G(sqlite_max_size_mb);
+        storage = new SqliteStorage(dbPath, true, maxSizeMB);
+        if (storage->initialize()) {
+            return storage;
+        }
+        delete storage;
+        // SQLite 初始化失败，回退到 JSON 文件
+    }
+#endif
+
+    // 默认或 JSON 模式：使用 JSON 文件存储
+    storage = new JsonStorage(logPath);
     storage->initialize();
     return storage;
+}
+
+// 确保存储后端在当前进程中有效（检测 fork() 后的有效性）
+static void ensure_storage_valid() {
+    pid_t current_pid = getpid();
+    pid_t expected_pid = g_storage_pid.load();
+
+    // 如果 g_storage 为空，或者当前 PID 与记录的 PID 不匹配，说明是新的 worker
+    // 需要重新初始化存储后端
+    if (g_storage == nullptr || current_pid != expected_pid) {
+        // 清理旧的存储后端（如果是不同的 PID）
+        if (g_storage != nullptr) {
+            g_storage->shutdown();
+            delete g_storage;
+            g_storage = nullptr;
+        }
+
+        // 创建新的存储后端
+        g_storage = create_storage_backend();
+        g_storage_pid.store(current_pid);
+    }
 }
 
 void sky_module_init(struct service_info *info) {
@@ -107,8 +154,11 @@ void sky_module_init(struct service_info *info) {
 
     Manager::setupServiceInfo(opt, info);
 
-    // 初始化存储后端（仅 JSON 文件存储）
-    g_storage = create_storage_backend();
+    // 注意：不在 MINIT 中初始化存储后端！
+    // 在 PHP-FPM master-worker 模式下，master 进程 fork 出 worker
+    // 如果在 master 中初始化 g_storage，worker 继承后会检测到 PID 不匹配
+    // 导致每个 worker 第一次处理请求时都重新初始化
+    // 正确的做法是：只在 worker 处理请求时初始化（通过 sky_request_init 中的 ensure_storage_valid）
 
     // 使用原子文件创建替代文件锁机制
     // O_CREAT | O_EXCL 是内核级原子操作，确保只有一个进程输出初始化日志
@@ -145,7 +195,13 @@ void sky_module_init(struct service_info *info) {
                 sky_log("service: " + std::string(info->service));
                 sky_log("service_instance: " + std::string(info->service_instance));
                 sky_log("log_file_path: " + opt.log_file_path);
-                sky_log("storage: JSON file backend");
+
+                // 获取实际使用的存储类型
+                const char* storageType = SKYWALKING_G(storage_type) ? SKYWALKING_G(storage_type) : "sqlite";
+                #ifndef HAVE_SQLITE3
+                storageType = "json";
+                #endif
+                sky_log("storage: " + std::string(storageType) + " backend");
                 sky_log("the apache skywalking php plugin mounted");
 
                 // 写入 PID（用于调试，可选）
@@ -171,10 +227,14 @@ void sky_module_cleanup() {
         g_storage->shutdown();
         delete g_storage;
         g_storage = nullptr;
+        g_storage_pid.store(0);
     }
 }
 
 void sky_request_init(zval *request, uint64_t request_id, struct service_info *info) {
+    // 确保存储后端在当前进程中有效（检测 fork() 后是否需要重新初始化）
+    ensure_storage_valid();
+
     array_init(&SKYWALKING_G(curl_header));
 
     // 只在调试模式下输出详细日志
@@ -348,6 +408,9 @@ static void write_trace_to_file(const std::string &json_str) {
 }
 
 void sky_request_flush(zval *response, uint64_t request_id) {
+    // 确保存储后端有效（双重检查）
+    ensure_storage_valid();
+
     auto *segment = sky_get_segment(nullptr, request_id);
     if (segment == nullptr) {
         if (SKYWALKING_G(log_enable)) {
