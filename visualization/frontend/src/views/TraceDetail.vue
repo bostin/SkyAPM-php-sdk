@@ -77,9 +77,76 @@
 
       <div class="chart-container">
         <div class="chart-container-inner" ref="chartWrapper">
-          <!-- 虚拟列表容器 -->
+          <!-- Entry Span 置顶区域 -->
+          <div v-if="entrySpans.length > 0" class="entry-span-header">
+            <div
+              v-for="span in entrySpans"
+              :key="span.spanId"
+              class="span-row entry-span-row"
+              :style="{ paddingLeft: (span.depth * 20) + 'px' }"
+            >
+              <div class="span-info">
+                <div class="span-name">
+                  <el-tag
+                    :size="span.spanType === 0 ? 'default' : 'small'"
+                    :type="
+                      span.spanLayer === 3 ? 'primary' :
+                      span.spanLayer === 5 ? 'info' :
+                      span.spanLayer === 2 ? 'success' : 'warning'
+                    "
+                    effect="light"
+                  >
+                    {{ getSpanTypeName(span.spanType) }}
+                  </el-tag>
+                  <span class="operation-name">{{ span.operationName }}</span>
+                </div>
+                <div class="span-meta">
+                  <el-text size="small" type="info">
+                    #{{ span.spanId }}
+                  </el-text>
+                  <el-text v-if="span.peer" size="small" type="info" style="margin-left: 8px">
+                    {{ span.peer }}
+                  </el-text>
+                </div>
+              </div>
+
+              <div class="span-timeline">
+                <el-tooltip placement="top" :disabled="span.spanType === 0">
+                  <template #content>
+                    <div class="span-tooltip">
+                      <div><strong>{{ span.operationName }}</strong></div>
+                      <div>耗时: {{ span.duration }} ms</div>
+                      <div v-if="span.peer">对端: {{ span.peer }}</div>
+                      <div v-if="span.tags && span.tags.length > 0">
+                        <strong>Tags:</strong>
+                        <div v-for="tag in span.tags" :key="tag.key" style="margin-left: 10px;">
+                          {{ tag.key }}: {{ tag.value }}
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <div
+                    class="span-bar"
+                    :style="{
+                      left: spanStartTimePos(span) + 'px',
+                      width: spanDurationWidth(span) + 'px',
+                      backgroundColor: getSpanColor(span)
+                    }"
+                  >
+                    <div class="span-bar-content">
+                      <el-text type="white" size="small">
+                        {{ span.duration }}
+                      </el-text>
+                    </div>
+                  </div>
+                </el-tooltip>
+              </div>
+            </div>
+          </div>
+
+          <!-- 虚拟列表容器（非 Entry Span） -->
           <div
-            v-if="spans && spans.length > 0"
+            v-if="nonEntrySpans.length > 0"
             ref="virtualScrollContainer"
             class="virtual-scroll-container"
             @scroll="handleScroll"
@@ -92,7 +159,7 @@
                 :style="{ transform: `translateY(${offsetY}px)` }"
               >
                 <div
-                  v-for="span in visibleSpans"
+                  v-for="span in visibleNonEntrySpans"
                   :key="span.spanId"
                   class="span-row"
                   :style="{ paddingLeft: (span.depth * 20) + 'px' }"
@@ -156,6 +223,10 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <div v-else-if="spans && spans.length > 0 && nonEntrySpans.length === 0" class="empty-chart">
+            <el-empty description="暂无更多 Span 数据" />
           </div>
 
           <div v-else class="empty-chart">
@@ -222,9 +293,19 @@ const availableDbTypes = computed(() => {
   return Array.from(dbTypes).sort()
 })
 
-// 虚拟列表计算
+// Entry Span（置顶显示）
+const entrySpans = computed(() => {
+  return flattenedSpans.value.filter(span => span.spanType === 0)
+})
+
+// 非 Entry Span（虚拟滚动）
+const nonEntrySpans = computed(() => {
+  return flattenedSpans.value.filter(span => span.spanType !== 0)
+})
+
+// 虚拟列表计算（基于非 Entry Span）
 const totalHeight = computed(() => {
-  return flattenedSpans.value.length * ROW_HEIGHT
+  return nonEntrySpans.value.length * ROW_HEIGHT
 })
 
 const offsetY = computed(() => {
@@ -240,11 +321,11 @@ const startIndex = computed(() => {
 })
 
 const endIndex = computed(() => {
-  return Math.min(flattenedSpans.value.length, startIndex.value + visibleCount.value)
+  return Math.min(nonEntrySpans.value.length, startIndex.value + visibleCount.value)
 })
 
-const visibleSpans = computed(() => {
-  return flattenedSpans.value.slice(startIndex.value, endIndex.value)
+const visibleNonEntrySpans = computed(() => {
+  return nonEntrySpans.value.slice(startIndex.value, endIndex.value)
 })
 
 const handleScroll = () => {
@@ -681,5 +762,18 @@ watch([minDuration, selectedDbTypes], () => {
   left: 0;
   right: 0;
   top: 0;
+}
+
+/* Entry Span 置顶区域样式 */
+.entry-span-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 2px solid #409eff;
+  background-color: #ecf5ff;
+}
+
+.entry-span-row {
+  background-color: #ecf5ff;
 }
 </style>
