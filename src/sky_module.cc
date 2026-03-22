@@ -129,8 +129,10 @@ void sky_module_init(struct service_info *info) {
 
     Manager::setupServiceInfo(opt, info);
 
-    // 初始化存储后端（仅 JSON 文件存储）
-    g_storage = create_storage_backend();
+    // 初始化存储后端（只初始化一次）
+    if (!g_storage) {
+        g_storage = create_storage_backend();
+    }
 
     // 使用原子文件创建替代文件锁机制
     // O_CREAT | O_EXCL 是内核级原子操作，确保只有一个进程输出初始化日志

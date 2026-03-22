@@ -107,10 +107,13 @@ bool SqliteStorage::initialize() {
         sqlite3_finalize(stmt);
     }
 
-    // 只在首次初始化时打印日志，防止 PHP-FPM 多 worker 环境下重复输出
-    if (!initialized_ && SKYWALKING_G(log_enable)) {
+    // 使用静态变量确保整个进程内只打印一次初始化日志
+    // 每个 PHP-FPM worker 是独立进程，仍会各自打印一次（这是预期行为）
+    static bool s_init_log_printed = false;
+    if (!s_init_log_printed && SKYWALKING_G(log_enable)) {
         sky_log("SqliteStorage: initialized, database=" + dbPath_ +
                 ", traces=" + std::to_string(totalTraces_.load()));
+        s_init_log_printed = true;
     }
     initialized_ = true;
 
