@@ -77,68 +77,83 @@
 
       <div class="chart-container">
         <div class="chart-container-inner" ref="chartWrapper">
-          <div v-if="spans && spans.length > 0" class="waterfall-chart">
-            <div
-              v-for="(span, index) in flattenedSpans"
-              :key="span.spanId"
-              class="span-row"
-              :style="{ paddingLeft: (span.depth * 20) + 'px' }"
-            >
-              <div class="span-info">
-                <div class="span-name">
-                  <el-tag
-                    :size="span.spanType === 0 ? 'default' : 'small'"
-                    :type="
-                      span.spanLayer === 3 ? 'primary' :
-                      span.spanLayer === 5 ? 'info' :
-                      span.spanLayer === 2 ? 'success' : 'warning'
-                    "
-                    effect="light"
-                  >
-                    {{ getSpanTypeName(span.spanType) }}
-                  </el-tag>
-                  <span class="operation-name">{{ span.operationName }}</span>
-                </div>
-                <div class="span-meta">
-                  <el-text size="small" type="info">
-                    #{{ span.spanId }}
-                  </el-text>
-                  <el-text v-if="span.peer" size="small" type="info" style="margin-left: 8px">
-                    {{ span.peer }}
-                  </el-text>
-                </div>
-              </div>
-
-              <div class="span-timeline">
-                <el-tooltip placement="top" :disabled="span.spanType === 0">
-                  <template #content>
-                    <div class="span-tooltip">
-                      <div><strong>{{ span.operationName }}</strong></div>
-                      <div>耗时: {{ span.duration }} ms</div>
-                      <div v-if="span.peer">对端: {{ span.peer }}</div>
-                      <div v-if="span.tags && span.tags.length > 0">
-                        <strong>Tags:</strong>
-                        <div v-for="tag in span.tags" :key="tag.key" style="margin-left: 10px;">
-                          {{ tag.key }}: {{ tag.value }}
-                        </div>
-                      </div>
+          <!-- 虚拟列表容器 -->
+          <div
+            v-if="spans && spans.length > 0"
+            ref="virtualScrollContainer"
+            class="virtual-scroll-container"
+            @scroll="handleScroll"
+          >
+            <!-- 虚拟列表总高度占位 -->
+            <div class="virtual-scroll-spacer" :style="{ height: totalHeight + 'px' }">
+              <!-- 可见区域的内容 -->
+              <div
+                class="virtual-scroll-content"
+                :style="{ transform: `translateY(${offsetY}px)` }"
+              >
+                <div
+                  v-for="span in visibleSpans"
+                  :key="span.spanId"
+                  class="span-row"
+                  :style="{ paddingLeft: (span.depth * 20) + 'px' }"
+                >
+                  <div class="span-info">
+                    <div class="span-name">
+                      <el-tag
+                        :size="span.spanType === 0 ? 'default' : 'small'"
+                        :type="
+                          span.spanLayer === 3 ? 'primary' :
+                          span.spanLayer === 5 ? 'info' :
+                          span.spanLayer === 2 ? 'success' : 'warning'
+                        "
+                        effect="light"
+                      >
+                        {{ getSpanTypeName(span.spanType) }}
+                      </el-tag>
+                      <span class="operation-name">{{ span.operationName }}</span>
                     </div>
-                  </template>
-                  <div
-                    class="span-bar"
-                    :style="{
-                      left: spanStartTimePos(span) + 'px',
-                      width: spanDurationWidth(span) + 'px',
-                      backgroundColor: getSpanColor(span)
-                    }"
-                  >
-                    <div class="span-bar-content">
-                      <el-text type="white" size="small">
-                        {{ span.duration }}
+                    <div class="span-meta">
+                      <el-text size="small" type="info">
+                        #{{ span.spanId }}
+                      </el-text>
+                      <el-text v-if="span.peer" size="small" type="info" style="margin-left: 8px">
+                        {{ span.peer }}
                       </el-text>
                     </div>
                   </div>
-                </el-tooltip>
+
+                  <div class="span-timeline">
+                    <el-tooltip placement="top" :disabled="span.spanType === 0">
+                      <template #content>
+                        <div class="span-tooltip">
+                          <div><strong>{{ span.operationName }}</strong></div>
+                          <div>耗时: {{ span.duration }} ms</div>
+                          <div v-if="span.peer">对端: {{ span.peer }}</div>
+                          <div v-if="span.tags && span.tags.length > 0">
+                            <strong>Tags:</strong>
+                            <div v-for="tag in span.tags" :key="tag.key" style="margin-left: 10px;">
+                              {{ tag.key }}: {{ tag.value }}
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                      <div
+                        class="span-bar"
+                        :style="{
+                          left: spanStartTimePos(span) + 'px',
+                          width: spanDurationWidth(span) + 'px',
+                          backgroundColor: getSpanColor(span)
+                        }"
+                      >
+                        <div class="span-bar-content">
+                          <el-text type="white" size="small">
+                            {{ span.duration }}
+                          </el-text>
+                        </div>
+                      </div>
+                    </el-tooltip>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -167,7 +182,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import {
@@ -185,6 +200,13 @@ const minDuration = ref<number>(0)
 const selectedDbTypes = ref<string[]>([])
 const loading = ref(false)
 
+// 虚拟列表相关
+const virtualScrollContainer = ref<HTMLElement | null>(null)
+const ROW_HEIGHT = 50 // 每行高度 (px)
+const BUFFER_SIZE = 5 // 缓冲行数
+const scrollTop = ref(0)
+const containerHeight = ref(600)
+
 // 收集所有 db.type
 const availableDbTypes = computed(() => {
   const dbTypes = new Set<string>()
@@ -199,6 +221,37 @@ const availableDbTypes = computed(() => {
   })
   return Array.from(dbTypes).sort()
 })
+
+// 虚拟列表计算
+const totalHeight = computed(() => {
+  return flattenedSpans.value.length * ROW_HEIGHT
+})
+
+const offsetY = computed(() => {
+  return Math.floor(scrollTop.value / ROW_HEIGHT) * ROW_HEIGHT
+})
+
+const visibleCount = computed(() => {
+  return Math.ceil(containerHeight.value / ROW_HEIGHT) + BUFFER_SIZE * 2
+})
+
+const startIndex = computed(() => {
+  return Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - BUFFER_SIZE)
+})
+
+const endIndex = computed(() => {
+  return Math.min(flattenedSpans.value.length, startIndex.value + visibleCount.value)
+})
+
+const visibleSpans = computed(() => {
+  return flattenedSpans.value.slice(startIndex.value, endIndex.value)
+})
+
+const handleScroll = () => {
+  if (virtualScrollContainer.value) {
+    scrollTop.value = virtualScrollContainer.value.scrollTop
+  }
+}
 
 const sortedSpans = computed(() => {
   if (!spans.value) return []
@@ -416,6 +469,14 @@ const fetchTrace = async () => {
 onMounted(() => {
   fetchTrace()
 })
+
+// 当过滤条件变化时重置滚动位置
+watch([minDuration, selectedDbTypes], () => {
+  scrollTop.value = 0
+  if (virtualScrollContainer.value) {
+    virtualScrollContainer.value.scrollTop = 0
+  }
+})
 </script>
 
 <style scoped>
@@ -602,5 +663,23 @@ onMounted(() => {
 
 .span-tooltip strong {
   color: #409eff;
+}
+
+/* 虚拟列表样式 */
+.virtual-scroll-container {
+  height: 600px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.virtual-scroll-spacer {
+  position: relative;
+}
+
+.virtual-scroll-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
 }
 </style>
