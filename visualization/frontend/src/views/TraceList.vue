@@ -72,7 +72,7 @@
     <el-card class="table-card">
       <template #header>
         <div class="card-header">
-          <span class="card-title">Trace 列表</span>
+          <span class="card-title">调用列表</span>
           <el-text class="total-text" size="small">
             共 {{ pagination.total }} 条
           </el-text>

@@ -6,7 +6,7 @@
           <el-button link @click="goBack">
             <ArrowLeft />返回
           </el-button>
-          <span class="card-title">Trace 详情</span>
+          <span class="card-title">调用详情</span>
         </div>
       </template>
 
