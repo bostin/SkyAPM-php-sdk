@@ -19,6 +19,7 @@
 #include <regex>
 #include "sky_pdo.h"
 #include "sky_utils.h"
+#include "sky_core_span_log.h"
 
 #include "segment.h"
 
