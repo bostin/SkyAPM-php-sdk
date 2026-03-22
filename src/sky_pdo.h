@@ -24,6 +24,10 @@
 #include "sky_core_span_log.h"
 #include <string>
 
+#ifdef HAVE_PDO
+#include "ext/pdo/php_pdo_driver.h"
+#endif
+
 Span *sky_pdo(zend_execute_data *execute_data, const std::string &class_name, const std::string &function_name);
 
 std::string sky_pdo_statement_peer(Span *span, zend_execute_data *execute_data);
