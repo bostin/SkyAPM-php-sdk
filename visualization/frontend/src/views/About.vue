@@ -1,9 +1,9 @@
 <template>
   <div class="about-container">
     <el-card>
-      <h2>PHP调用栈可视化</h2>
+      <h2>PHP外部调用链路可视化</h2>
       <p>版本: 1.0.0</p>
-      <p>用于可视化 PHP 应用生成的分布式调用链数据。</p>
+      <p>用于可视化 PHP 应用生成的外部调用链路数据。</p>
 
       <h3>功能特性</h3>
       <el-list>
