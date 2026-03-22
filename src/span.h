@@ -54,21 +54,21 @@ public:
 
     const std::vector<SkySegmentReference *>& getRefs();
 
-    const std::string& getOperationName();
+    const std::string& getOperationName() const;
 
-    const std::string& getPeer();
+    const std::string& getPeer() const;
 
-    SkySpanType getSpanType();
+    SkySpanType getSpanType() const;
 
-    SkySpanLayer getSpanLayer();
+    SkySpanLayer getSpanLayer() const;
 
     int getComponentId() const;
 
     bool getIsError() const;
 
-    const std::vector<Tag *>& getTags();
+    const std::vector<Tag *>& getTags() const;
 
-    const std::vector<SkyCoreSpanLog*>& getLogs();
+    const std::vector<SkyCoreSpanLog*>& getLogs() const;
 
     bool getSkipAnalysis() const;
 

@@ -25,9 +25,9 @@ class Tag {
 public:
     Tag(std::string key, std::string value);
 
-    const std::string& getKey();
-    
-    const std::string& getValue();
+    const std::string& getKey() const;
+
+    const std::string& getValue() const;
 
 private:
     std::string _key;

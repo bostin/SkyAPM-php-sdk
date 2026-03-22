@@ -523,6 +523,9 @@ bool SqliteStorage::checkpoint() {
         return false;
     }
 
+#ifndef SQLITE_CHECKPOINT_TRUNCATE
+#define SQLITE_CHECKPOINT_TRUNCATE 3
+#endif
     int rc = sqlite3_wal_checkpoint_v2(db_, nullptr, SQLITE_CHECKPOINT_TRUNCATE,
                                        nullptr, nullptr);
 

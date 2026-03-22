@@ -69,19 +69,19 @@ const std::vector<SkySegmentReference*>& Span::getRefs() {
     return refs;
 }
 
-const std::string& Span::getOperationName() {
+const std::string& Span::getOperationName() const {
     return operationName;
 }
 
-const std::string& Span::getPeer() {
+const std::string& Span::getPeer() const {
     return peer;
 }
 
-SkySpanType Span::getSpanType() {
+SkySpanType Span::getSpanType() const {
     return spanType;
 }
 
-SkySpanLayer Span::getSpanLayer() {
+SkySpanLayer Span::getSpanLayer() const {
     return spanLayer;
 }
 
@@ -93,11 +93,11 @@ bool Span::getIsError() const {
     return isError;
 }
 
-const std::vector<Tag*>& Span::getTags() {
+const std::vector<Tag*>& Span::getTags() const {
     return tags;
 }
 
-const std::vector<SkyCoreSpanLog*>& Span::getLogs() {
+const std::vector<SkyCoreSpanLog*>& Span::getLogs() const {
     return logs;
 }
 
