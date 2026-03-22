@@ -12,7 +12,7 @@
 
       <div class="trace-info">
         <el-space wrap :fill="true">
-          <el-statistic title="Trace ID" :value="trace?.traceId" :show-group-separator>
+          <el-statistic title="调用ID" :value="trace?.traceId" :show-group-separator>
             <template #suffix>
               <el-button link type="primary" @click="copyToClipboard(trace?.traceId || '')">
                 复制
@@ -34,7 +34,7 @@
           </el-statistic>
 
           <el-statistic
-            title="Span 数量"
+            title="Span数"
             :value="spans?.length"
           />
         </el-space>
@@ -44,7 +44,7 @@
     <el-card class="chart-card" v-loading="loading">
       <template #header>
         <div class="card-header">
-          <span class="card-title">调用链瀑布图</span>
+          <span class="card-title">调用瀑布图</span>
           <div class="filter-controls">
             <el-input-number
               v-model="minDuration"
