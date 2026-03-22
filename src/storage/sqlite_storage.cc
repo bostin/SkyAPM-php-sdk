@@ -569,21 +569,24 @@ std::string SqliteStorage::extractUrl(Segment* segment) {
     }
 
     const auto& spans = segment->getSpans();
+    if (spans.empty()) {
+        return "";
+    }
+
+    // 优先返回 Entry span 的 operation name（入口请求的 URL）
+    // Entry span 代表 PHP 应用收到的原始请求，应该作为显示的 URL
     for (const auto* span : spans) {
-        if (span && span->getSpanType() == SkySpanType::Exit) {
+        if (span && span->getSpanType() == SkySpanType::Entry) {
             std::string operationName = span->getOperationName();
-            if (!operationName.empty()) {
+            if (!operationName.empty() && operationName != "/") {
                 return operationName;
             }
         }
     }
 
-    // 如果没有找到 Exit span，返回第一个 span 的 operation name
-    if (!spans.empty() && spans[0]) {
-        return spans[0]->getOperationName();
-    }
-
-    return "";
+    // 如果没有找到合适的 Entry span，返回第一个 span 的 operation name
+    // 这通常是最外层的 span，可能包含有意义的路径信息
+    return spans[0]->getOperationName();
 }
 
 int SqliteStorage::extractStatusCode(Segment* segment) {
