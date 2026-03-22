@@ -24,7 +24,16 @@
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <chrono>
+#include <atomic>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#include <thread>
+
+// 进程级标志：记录是否已打印过初始化日志（跨 shutdown/initialize 周期）
+static std::atomic<pid_t> s_init_logged_pid(0);
 
 SqliteStorage::SqliteStorage(const std::string& dbPath, bool walMode, int maxSizeMB)
     : dbPath_(dbPath)
@@ -112,13 +121,16 @@ bool SqliteStorage::initialize() {
         sqlite3_finalize(stmt);
     }
 
-    // 使用静态变量确保整个进程内只打印一次初始化日志
-    // 每个 PHP-FPM worker 是独立进程，仍会各自打印一次（这是预期行为）
-    static bool s_init_log_printed = false;
-    if (!s_init_log_printed && SKYWALKING_G(log_enable)) {
-        sky_log("SqliteStorage: initialized, database=" + dbPath_ +
-                ", traces=" + std::to_string(totalTraces_.load()));
-        s_init_log_printed = true;
+    // 使用进程级标志确保整个进程内只打印一次初始化日志
+    // 防止 shutdown() 后重新 initialize() 导致重复日志
+    pid_t current_pid = getpid();
+    pid_t expected_pid = 0;
+    if (s_init_logged_pid.compare_exchange_strong(expected_pid, current_pid)) {
+        // 只有成功获取标志的进程才打印日志
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("SqliteStorage: initialized, database=" + dbPath_ +
+                    ", traces=" + std::to_string(totalTraces_.load()));
+        }
     }
     initialized_ = true;
 

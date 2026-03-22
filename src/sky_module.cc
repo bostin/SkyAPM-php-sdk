@@ -25,6 +25,7 @@
 #include <random>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <atomic>
 
 #include "segment.h"
 #include "sky_utils.h"
@@ -55,6 +56,9 @@ extern void (*orig_curl_close)(INTERNAL_FUNCTION_PARAMETERS);
 // 全局存储接口指针
 static StorageInterface* g_storage = nullptr;
 
+// 记录 g_storage 所属的进程 PID（用于检测 worker 是否需要重新初始化）
+static std::atomic<pid_t> g_storage_pid(0);
+
 // 创建存储后端实例
 static StorageInterface* create_storage_backend() {
     std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
@@ -80,6 +84,27 @@ static StorageInterface* create_storage_backend() {
     storage = new JsonStorage(logPath);
     storage->initialize();
     return storage;
+}
+
+// 确保存储后端在当前进程中有效（检测 fork() 后的有效性）
+static void ensure_storage_valid() {
+    pid_t current_pid = getpid();
+    pid_t expected_pid = g_storage_pid.load();
+
+    // 如果 g_storage 为空，或者当前 PID 与记录的 PID 不匹配，说明是新的 worker
+    // 需要重新初始化存储后端
+    if (g_storage == nullptr || current_pid != expected_pid) {
+        // 清理旧的存储后端（如果是不同的 PID）
+        if (g_storage != nullptr) {
+            g_storage->shutdown();
+            delete g_storage;
+            g_storage = nullptr;
+        }
+
+        // 创建新的存储后端
+        g_storage = create_storage_backend();
+        g_storage_pid.store(current_pid);
+    }
 }
 
 void sky_module_init(struct service_info *info) {
@@ -129,10 +154,8 @@ void sky_module_init(struct service_info *info) {
 
     Manager::setupServiceInfo(opt, info);
 
-    // 初始化存储后端（只初始化一次）
-    if (!g_storage) {
-        g_storage = create_storage_backend();
-    }
+    // 初始化存储后端（确保在当前进程中有效）
+    ensure_storage_valid();
 
     // 使用原子文件创建替代文件锁机制
     // O_CREAT | O_EXCL 是内核级原子操作，确保只有一个进程输出初始化日志
@@ -201,10 +224,14 @@ void sky_module_cleanup() {
         g_storage->shutdown();
         delete g_storage;
         g_storage = nullptr;
+        g_storage_pid.store(0);
     }
 }
 
 void sky_request_init(zval *request, uint64_t request_id, struct service_info *info) {
+    // 确保存储后端在当前进程中有效（检测 fork() 后是否需要重新初始化）
+    ensure_storage_valid();
+
     array_init(&SKYWALKING_G(curl_header));
 
     // 只在调试模式下输出详细日志
@@ -378,6 +405,9 @@ static void write_trace_to_file(const std::string &json_str) {
 }
 
 void sky_request_flush(zval *response, uint64_t request_id) {
+    // 确保存储后端有效（双重检查）
+    ensure_storage_valid();
+
     auto *segment = sky_get_segment(nullptr, request_id);
     if (segment == nullptr) {
         if (SKYWALKING_G(log_enable)) {
