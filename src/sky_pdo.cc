@@ -75,8 +75,7 @@ Span *sky_pdo(zend_execute_data *execute_data, const std::string &class_name, co
 std::string sky_pdo_statement_peer(Span *span, zend_execute_data *execute_data) {
     pdo_stmt_t *stmt = (pdo_stmt_t *) Z_PDO_STMT_P(&(execute_data->This));
 
-    if (stmt != nullptr) {
-
+    if (stmt != nullptr && stmt->query_string != nullptr) {
         span->addTag("db.statement", stmt->query_string);
 
         if (stmt->dbh != nullptr) {
@@ -129,15 +128,29 @@ std::string sky_pdo_dbh_peer(Span *span, pdo_dbh_t *dbh) {
     return nullptr;
 }
 
-void sky_pdo_check_errors(zend_execute_data *execute_data, Span *span) {    
+void sky_pdo_check_errors(zend_execute_data *execute_data, Span *span) {
     zval *obj = &(execute_data)->This, property, return_ptr;
     ZVAL_STRING(&property, "errorInfo");
-    
-    call_user_function(CG(function_table), obj, &property, &return_ptr, 0, nullptr);
+
+    if (call_user_function(CG(function_table), obj, &property, &return_ptr, 0, nullptr) != SUCCESS) {
+        zval_dtor(&property);
+        return;
+    }
+
     if (Z_TYPE(return_ptr) == IS_ARRAY) {
-        span->pushLog(new SkyCoreSpanLog("SQLSTATE", Z_STRVAL_P(zend_hash_index_find(Z_ARRVAL(return_ptr), 0))));
-        span->pushLog(new SkyCoreSpanLog("Error Code", std::to_string(Z_LVAL_P(zend_hash_index_find(Z_ARRVAL(return_ptr), 1)))));
-        span->pushLog(new SkyCoreSpanLog("Error", Z_STRVAL_P(zend_hash_index_find(Z_ARRVAL(return_ptr), 2))));
+        zval *sqlstate = zend_hash_index_find(Z_ARRVAL(return_ptr), 0);
+        zval *errcode = zend_hash_index_find(Z_ARRVAL(return_ptr), 1);
+        zval *errmsg = zend_hash_index_find(Z_ARRVAL(return_ptr), 2);
+
+        if (sqlstate && Z_TYPE_P(sqlstate) == IS_STRING) {
+            span->addLog("SQLSTATE", Z_STRVAL_P(sqlstate));
+        }
+        if (errcode) {
+            span->addLog("Error Code", std::to_string(Z_LVAL_P(errcode)));
+        }
+        if (errmsg && Z_TYPE_P(errmsg) == IS_STRING) {
+            span->addLog("Error", Z_STRVAL_P(errmsg));
+        }
     }
 
     zval_dtor(&return_ptr);
