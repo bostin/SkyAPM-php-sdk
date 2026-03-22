@@ -54,6 +54,18 @@ if test "$have_sqlite3" = "no"; then
   AC_MSG_WARN([SQLite3 library not found, SQLite storage will be disabled])
 fi
 
+# 检查 PDO 扩展
+AC_MSG_CHECKING([for php_pdo.h])
+have_pdo="no"
+if test -f "$phpincludedir/ext/pdo/php_pdo.h"; then
+  have_pdo="yes"
+  PHP_ADD_INCLUDE("$phpincludedir/ext/pdo")
+  AC_DEFINE([HAVE_PDO], 1, [Enable PDO support])
+  AC_MSG_RESULT([found])
+else
+  AC_MSG_RESULT([not found])
+fi
+
 if test "$PHP_SKYWALKING" != "no"; then
 
   LIBS="-lpthread $LIBS"
