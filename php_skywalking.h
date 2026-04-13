@@ -149,6 +149,7 @@ ZEND_BEGIN_MODULE_GLOBALS(skywalking)
     // 采样率限制
     void *rate_limiter;               // 限流器指针
     int sample_n_per_3_secs;          // 每 3 秒采样数量（-1 表示不限制）
+    char *trace_uri_patterns;          // 只采集匹配的 URI，逗号分隔，空值表示不过滤
 
     // 实例标识
     char *instance_name;              // 实例名称（留空则自动生成）

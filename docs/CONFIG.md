@@ -30,6 +30,11 @@ skywalking.error_handler_enable = 0
 ; Optional: Sampling rate (-1 for unlimited, or N traces per 3 seconds)
 skywalking.sample_n_per_3_secs = -1
 
+; Optional: URI allowlist. Empty means trace all URIs.
+; Comma-separated patterns support exact match and trailing-* prefix match.
+; Examples: /api/order,/admin/*
+skywalking.trace_uri_patterns = ""
+
 ; Optional: Fixed instance name (auto-generated if empty)
 skywalking.instance_name = ""
 ```

@@ -105,6 +105,12 @@ PHP_INI_BEGIN()
     // 用于控制高负载下的追踪数据量
     STD_PHP_INI_ENTRY("skywalking.sample_n_per_3_secs", "-1", PHP_INI_ALL, OnUpdateLong, sample_n_per_3_secs, zend_skywalking_globals, skywalking_globals)
 
+    // URI 白名单配置
+    // 空值 = 不限制，采集所有 URI
+    // 非空 = 逗号分隔的 URI 列表，支持精确匹配和末尾 * 前缀匹配
+    // 示例: /api/order,/admin/*
+    STD_PHP_INI_ENTRY("skywalking.trace_uri_patterns", "", PHP_INI_ALL, OnUpdateString, trace_uri_patterns, zend_skywalking_globals, skywalking_globals)
+
     // 实例名称（可选）
     // 留空则自动生成 UUID@IP 格式的实例名
     // 用于标识服务实例，便于在分布式环境中识别
@@ -149,6 +155,7 @@ static void php_skywalking_init_globals(zend_skywalking_globals *skywalking_glob
 
     // rate limit
     skywalking_globals->sample_n_per_3_secs = -1;
+    skywalking_globals->trace_uri_patterns = nullptr;
 
     // uuid path
     skywalking_globals->instance_name = nullptr;

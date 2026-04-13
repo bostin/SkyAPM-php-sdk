@@ -59,6 +59,70 @@ static StorageInterface* g_storage = nullptr;
 // 记录 g_storage 所属的进程 PID（用于检测 worker 是否需要重新初始化）
 static std::atomic<pid_t> g_storage_pid(0);
 
+static bool is_uri_pattern_space(char ch) {
+    return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f' || ch == '\v';
+}
+
+static std::string trim_uri_pattern(const std::string &pattern) {
+    size_t start = 0;
+    while (start < pattern.size() && is_uri_pattern_space(pattern[start])) {
+        ++start;
+    }
+
+    size_t end = pattern.size();
+    while (end > start && is_uri_pattern_space(pattern[end - 1])) {
+        --end;
+    }
+
+    return pattern.substr(start, end - start);
+}
+
+static bool uri_matches_pattern(const std::string &uri, const std::string &pattern) {
+    if (pattern == "*") {
+        return true;
+    }
+
+    if (!pattern.empty() && pattern[pattern.size() - 1] == '*') {
+        std::string prefix = pattern.substr(0, pattern.size() - 1);
+        return uri.compare(0, prefix.size(), prefix) == 0;
+    }
+
+    return uri == pattern;
+}
+
+static bool sky_uri_should_trace(const std::string &uri) {
+    const char *patterns_config = SKYWALKING_G(trace_uri_patterns);
+    if (patterns_config == nullptr || patterns_config[0] == '\0') {
+        return true;
+    }
+
+    std::string patterns(patterns_config);
+    std::string path = uri;
+    size_t query_pos = path.find('?');
+    if (query_pos != std::string::npos) {
+        path = path.substr(0, query_pos);
+    }
+
+    size_t start = 0;
+    bool has_pattern = false;
+    while (start <= patterns.size()) {
+        size_t comma = patterns.find(',', start);
+        std::string pattern = trim_uri_pattern(patterns.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+        if (!pattern.empty()) {
+            has_pattern = true;
+            if (uri_matches_pattern(uri, pattern) || uri_matches_pattern(path, pattern)) {
+                return true;
+            }
+        }
+        if (comma == std::string::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+
+    return !has_pattern;
+}
+
 // 创建存储后端实例
 static StorageInterface* create_storage_backend() {
     std::string logPath = SKYWALKING_G(log_file_path) ? SKYWALKING_G(log_file_path) : "/tmp/skywalking";
@@ -318,6 +382,19 @@ void sky_request_init(zval *request, uint64_t request_id, struct service_info *i
         header = (sw != nullptr ? Z_STRVAL_P(sw) : "");
         uri = get_page_request_uri();
         peer = get_page_request_peer();
+    }
+
+    if (!sky_uri_should_trace(uri)) {
+        if (SKYWALKING_G(log_enable)) {
+            sky_log("sky_request_init: uri not matched by trace_uri_patterns, skipping segment: " + uri);
+        }
+        auto *segment = new Segment(info->service, info->service_instance, SKYWALKING_G(version), header);
+        segment->setSkip(true);
+        if (!sky_insert_segment(request_id, segment)) {
+            delete segment;
+        }
+
+        return;
     }
 
     std::unordered_map<uint64_t, Segment *> *segments = static_cast<std::unordered_map<uint64_t, Segment *> *>SKYWALKING_G(segment);
