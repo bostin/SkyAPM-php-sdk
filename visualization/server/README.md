@@ -4,14 +4,11 @@ Node.js Express API服务器，提供跟踪数据的RESTful接口。
 
 ## 开发
 
+依赖和脚本已合并到 `visualization` 根目录，请从根目录运行：
+
 ```bash
-# 安装依赖
 pnpm install
-
-# 启动开发服务器（热重载）
 pnpm dev
-
-# 构建并启动生产服务器
 pnpm build && pnpm start
 ```
 
@@ -54,7 +51,11 @@ POST /api/refresh
 
 ## 数据源
 
-从项目根目录的 `output/` 目录读取JSON格式的跟踪文件。
+默认使用 SQLite 数据库，也可以通过 `DATA_SOURCE=json` 从项目根目录的 `output/` 目录读取 JSON 格式的跟踪文件。
+
+## 子目录部署
+
+如果需要通过 nginx 部署到 `/skywalking/` 这类域名子目录，请参考上级 [README](../README.md) 的“生产部署”说明。前端需要使用 `VITE_BASE_URL=/skywalking/` 构建，nginx 需要将 `/skywalking/` 前缀剥掉后转发给 Node 服务。
 
 ## 缓存机制
 

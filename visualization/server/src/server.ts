@@ -14,6 +14,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import type { ViteDevServer } from 'vite';
 import {
     initDatabase,
     queryTraces,
@@ -30,6 +31,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // 数据源配置
 const DATA_SOURCE = process.env.DATA_SOURCE || 'sqlite'; // 'sqlite' or 'json'
@@ -52,8 +54,7 @@ let cacheTime = 0;
 // 初始化数据库（SQLite 模式）
 let dbInitialized = false;
 if (DATA_SOURCE === 'sqlite') {
-    initDatabase(DB_PATH);
-    dbInitialized = true;
+    dbInitialized = initDatabase(DB_PATH) !== null;
 }
 
 // ============ JSON 文件解析函数（兼容旧模式）============
@@ -335,35 +336,62 @@ app.get('/api/health', (req, res) => {
     }
 });
 
-// 静态文件服务（生产环境）
-const distPath = path.resolve(__dirname, '../..', 'frontend', 'dist');
-if (fs.existsSync(distPath)) {
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-    });
+async function configureFrontend(): Promise<ViteDevServer | null> {
+    const frontendRoot = path.resolve(__dirname, '../..', 'frontend');
+
+    if (NODE_ENV !== 'production') {
+        const { createServer } = await import('vite');
+        const vite = await createServer({
+            root: frontendRoot,
+            configFile: path.join(frontendRoot, 'vite.config.ts'),
+            server: { middlewareMode: true },
+            appType: 'spa'
+        });
+
+        app.use(vite.middlewares);
+        return vite;
+    }
+
+    const distPath = path.join(frontendRoot, 'dist');
+    if (fs.existsSync(distPath)) {
+        app.use(express.static(distPath));
+        app.get('*', (_req, res) => {
+            res.sendFile(path.join(distPath, 'index.html'));
+        });
+    } else {
+        console.warn(`Frontend dist directory not found: ${distPath}`);
+    }
+
+    return null;
 }
 
-// 启动服务器
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`Data source: ${DATA_SOURCE}`);
-    if (DATA_SOURCE === 'sqlite') {
-        console.log(`SQLite database: ${DB_PATH}`);
-    } else {
-        console.log(`Trace directory: ${TRACE_DIR}`);
-    }
-});
+async function startServer() {
+    const vite = await configureFrontend();
 
-// 优雅关闭
-process.on('SIGINT', () => {
-    console.log('Shutting down...');
-    closeDatabase();
-    process.exit(0);
-});
+    const server = app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+        console.log(`Mode: ${NODE_ENV}`);
+        console.log(`Data source: ${DATA_SOURCE}`);
+        if (DATA_SOURCE === 'sqlite') {
+            console.log(`SQLite database: ${DB_PATH}`);
+        } else {
+            console.log(`Trace directory: ${TRACE_DIR}`);
+        }
+    });
 
-process.on('SIGTERM', () => {
-    console.log('Shutting down...');
+    const shutdown = async () => {
+        console.log('Shutting down...');
+        closeDatabase();
+        await vite?.close();
+        server.close(() => process.exit(0));
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+}
+
+startServer().catch((error) => {
+    console.error('Failed to start server:', error);
     closeDatabase();
-    process.exit(0);
+    process.exit(1);
 });

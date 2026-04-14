@@ -2,7 +2,12 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
+const frontendRoot = fileURLToPath(new URL('.', import.meta.url))
+const baseUrl = process.env.VITE_BASE_URL || '/'
+
 export default defineConfig({
+  root: frontendRoot,
+  base: baseUrl,
   plugins: [
     vue(),
   ],

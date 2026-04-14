@@ -1,0 +1,4 @@
+node_modules
+dist
+frontend/dist
+skywalking_traces.db*

@@ -12,7 +12,7 @@
 
       <div class="trace-info">
         <el-space wrap :fill="true">
-          <el-statistic title="调用ID" :value="trace?.traceId" :show-group-separator>
+          <el-statistic title="调用ID" :value="trace?.traceId" show-group-separator>
             <template #suffix>
               <el-button link type="primary" @click="copyToClipboard(trace?.traceId || '')">
                 复制
@@ -255,7 +255,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import axios from 'axios'
+import { api } from '@/api'
 import {
   ArrowLeft,
   InfoFilled
@@ -333,11 +333,6 @@ const handleScroll = () => {
     scrollTop.value = virtualScrollContainer.value.scrollTop
   }
 }
-
-const sortedSpans = computed(() => {
-  if (!spans.value) return []
-  return [...spans.value].sort((a, b) => a.startTime - b.startTime)
-})
 
 // 检查 span 是否匹配过滤条件
 const spanMatchesFilter = (span: any): boolean => {
@@ -443,12 +438,8 @@ const timePerPx = computed(() => {
   return timeRange.value / chartWidth
 })
 
-const timeOffset = computed(() => {
-  return -minTime.value / timePerPx.value
-})
-
 const getSpanTypeName = (type: number) => {
-  const map = { 0: 'Entry', 1: 'Exit', 2: 'Local' }
+  const map: Record<number, string> = { 0: 'Entry', 1: 'Exit', 2: 'Local' }
   return map[type] || 'Unknown'
 }
 
@@ -530,7 +521,7 @@ const fetchTrace = async () => {
   loading.value = true
   const traceId = route.query.traceId || route.params.traceId
   try {
-    const response = await axios.get(`/api/traces/${traceId}`)
+    const response = await api.get(`traces/${traceId}`)
     if (response.data.success) {
       trace.value = response.data.data
       spans.value = response.data.data.spans || []

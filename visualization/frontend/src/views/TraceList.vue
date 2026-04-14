@@ -139,7 +139,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { api } from '@/api'
 
 interface Trace {
   traceId: string
@@ -243,7 +243,7 @@ const fetchData = async () => {
       }
     }
 
-    const response = await axios.get('/api/traces', { params })
+    const response = await api.get('traces', { params })
     if (response.data.success) {
       traces.value = response.data.data
       pagination.total = response.data.pagination?.total || 0

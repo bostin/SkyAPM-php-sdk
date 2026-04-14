@@ -1,0 +1,44 @@
+{
+  "name": "skywalking-php-visualizer",
+  "version": "1.0.0",
+  "description": "SkyWalking PHP trace visualization console",
+  "type": "module",
+  "engines": {
+    "node": ">=20 <25"
+  },
+  "scripts": {
+    "dev": "tsx watch server/src/server.ts",
+    "build": "vue-tsc -p frontend/tsconfig.json && vite build --config frontend/vite.config.ts && tsc -p tsconfig.server.json",
+    "start": "NODE_ENV=production node dist/server/server.js",
+    "migrate": "tsx server/src/migrate.ts"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "vue-demi"
+    ]
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "2.3.1",
+    "axios": "1.6.5",
+    "better-sqlite3": "9.4.3",
+    "cors": "2.8.5",
+    "echarts": "5.4.3",
+    "element-plus": "2.5.0",
+    "express": "4.18.2",
+    "vue": "3.4.15",
+    "vue-router": "4.2.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.8",
+    "@types/cors": "2.8.17",
+    "@types/express": "4.17.21",
+    "@types/node": "20.11.0",
+    "@vitejs/plugin-vue": "5.0.3",
+    "tsx": "4.6.0",
+    "typescript": "5.3.2",
+    "vite": "5.0.11",
+    "vue-tsc": "1.8.27"
+  }
+}

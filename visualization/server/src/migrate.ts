@@ -25,7 +25,7 @@ const __dirname = path.dirname(__filename);
 // Parse command line arguments
 const args = process.argv.slice(2);
 const DB_PATH = args[0] || path.resolve(__dirname, '../../..', 'skywalking_traces.db');
-const OUTPUT_DIR = args[2] || path.resolve(__dirname, '../../..', 'output');
+const OUTPUT_DIR = args[1] || path.resolve(__dirname, '../../..', 'output');
 
 interface TraceData {
     traceId: string;
@@ -237,14 +237,16 @@ function extractStatusCode(data: TraceData): number {
 function createProgressBar(total: number) {
     const width = 40;
     let lastPercentage = 0;
+    let current = 0;
 
     return {
         tick: (opts?: { status?: string }) => {
-            const percentage = Math.floor((successCount + errorCount) / total * 100);
+            current++;
+            const percentage = Math.floor(current / total * 100);
             if (percentage !== lastPercentage) {
                 const filled = Math.floor(width * percentage / 100);
                 const bar = '█'.repeat(filled) + '░'.repeat(width - filled);
-                process.stdout.write(`\r[${bar}] ${percentage}% (${successCount + errorCount}/${total})`);
+                process.stdout.write(`\r[${bar}] ${percentage}% (${current}/${total})`);
                 if (opts?.status) {
                     process.stdout.write(` ${opts.status}`);
                 }

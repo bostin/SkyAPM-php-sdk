@@ -4,18 +4,12 @@ Vue 3前端应用，提供跟踪数据的可视化展示。
 
 ## 开发
 
+依赖和脚本已合并到 `visualization` 根目录，请从根目录运行：
+
 ```bash
-# 安装依赖
 pnpm install
-
-# 启动开发服务器
 pnpm dev
-
-# 构建生产版本
 pnpm build
-
-# 预览生产构建
-pnpm preview
 ```
 
 ## 项目结构

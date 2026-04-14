@@ -27,7 +27,7 @@
         </el-list-item>
         <el-list-item>
           <el-icon :size="20" color="#f56c6c">
-            <Time />
+            <Timer />
           </el-icon>
           <span>时间轴分析 - 精确到毫秒</span>
         </el-list-item>
@@ -49,9 +49,9 @@
 
       <h3>使用说明</h3>
       <ol>
-        <li>启动后端服务: <code>cd server && npm install && npm run dev</code></li>
-        <li>启动前端开发服务器: <code>cd frontend && npm install && npm run dev</code></li>
-        <li>访问 <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></li>
+        <li>安装依赖: <code>pnpm install</code></li>
+        <li>启动服务: <code>pnpm dev</code></li>
+        <li>访问 <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></li>
       </ol>
 
       <el-button type="primary" @click="router.push('/')">
@@ -68,7 +68,7 @@ import {
   Search,
   Sort,
   DataAnalysis,
-  Time
+  Timer
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
